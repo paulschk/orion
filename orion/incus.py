@@ -131,6 +131,29 @@ class Incus:
     def state(self, name: str) -> dict:
         return self.query(f"/1.0/instances/{name}/state") or {}
 
+    def usage(self, name: str) -> dict:
+        """Live memory and disk figures, against the container's own quotas.
+
+        The `total` figures come from the instance's own limits, so everything
+        returned here is relative to the machine the client rents. The host's
+        headroom, by contrast, tells a client nothing at all.
+        """
+        try:
+            state = self.state(name)
+        except (IncusError, OSError):
+            return {}
+        if not state:
+            return {}
+        memory = state.get("memory") or {}
+        disk = (state.get("disk") or {}).get("root") or {}
+        return {
+            "running": (state.get("status") or "").lower() == "running",
+            "memory_used": int(memory.get("usage") or 0),
+            "memory_total": int(memory.get("total") or 0),
+            "disk_used": int(disk.get("usage") or 0),
+            "disk_total": int(disk.get("total") or 0),
+        }
+
     def config(self, name: str) -> dict:
         return self.query(f"/1.0/instances/{name}") or {}
 

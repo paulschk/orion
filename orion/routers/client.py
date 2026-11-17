@@ -12,7 +12,7 @@ from urllib.parse import quote
 from .. import activity, billing, db, identity, provision, sites, tasks
 from ..config import settings
 from ..deps import client_ip, fint, fstr, guard_csrf, require_user
-from ..hostinfo import allocation, detect, fits, headroom
+from ..hostinfo import detect, fits, headroom
 from ..incus import IncusError, incus
 from ..templating import render
 from ..util import days_from_now, now, rand_password, slugify
@@ -141,6 +141,48 @@ def instance_context(instance, *, deep: bool = True) -> dict:
 
 # --------------------------------------------------------------------------- dashboard
 
+MIB = 1024 * 1024
+GIB = 1024 * 1024 * 1024
+
+
+def _client_usage(instances):
+    """What the client rents, and what their instances actually consume.
+
+    Every figure is relative to the quotas of the plans they pay for. The host's
+    own headroom is deliberately not part of this: it is the operator's business
+    and it confused the client's view of their own machine.
+    """
+    totals = {"vcpu": 0, "ram_rented_mb": 0, "ram_used_mb": 0,
+              "disk_rented_gb": 0.0, "disk_used_gb": 0.0, "running": 0}
+    live = {}
+    for row in instances:
+        totals["vcpu"] += row["vcpu"] or 0
+        totals["ram_rented_mb"] += row["memory_mb"] or 0
+        totals["disk_rented_gb"] += row["disk_gb"] or 0
+        if row["status"] == "running":
+            totals["running"] += 1
+        else:
+            continue
+        try:
+            sample = incus.usage(row["incus_name"])
+        except IncusError:
+            sample = {}
+        if not sample:
+            continue
+        live[row["id"]] = sample
+        totals["ram_used_mb"] += round(sample["memory_used"] / MIB)
+        totals["disk_used_gb"] += sample["disk_used"] / GIB
+
+    totals["disk_used_gb"] = round(totals["disk_used_gb"], 1)
+    totals["ram_free_mb"] = max(0, totals["ram_rented_mb"] - totals["ram_used_mb"])
+    totals["disk_free_gb"] = max(0.0, round(totals["disk_rented_gb"] - totals["disk_used_gb"], 1))
+    totals["ram_pct"] = (min(100, round(100 * totals["ram_used_mb"] / totals["ram_rented_mb"]))
+                         if totals["ram_rented_mb"] else 0)
+    totals["disk_pct"] = (min(100, round(100 * totals["disk_used_gb"] / totals["disk_rented_gb"]))
+                          if totals["disk_rented_gb"] else 0)
+    return totals, live
+
+
 @router.get("")
 async def dashboard(request: Request):
     session = require_user(request)
@@ -150,11 +192,24 @@ async def dashboard(request: Request):
         "WHERE i.user_id = ? AND i.status != 'destroyed' ORDER BY i.id DESC",
         (session["uid"],))
     invoices = billing.for_user_with_context(session["uid"])[:6]
-    info = detect()
+    usage, live = _client_usage(instances)
+
+    rows = []
+    for instance in instances:
+        row = dict(instance)
+        sample = live.get(instance["id"])
+        if sample:
+            row["ram_used_mb"] = round(sample["memory_used"] / MIB)
+            row["disk_used_gb"] = round(sample["disk_used"] / GIB, 1)
+            row["ram_free_mb"] = max(0, (instance["memory_mb"] or 0) - row["ram_used_mb"])
+            row["disk_free_gb"] = max(0.0, round((instance["disk_gb"] or 0) - row["disk_used_gb"], 1))
+        else:
+            row["ram_used_mb"] = row["disk_used_gb"] = None
+            row["ram_free_mb"] = row["disk_free_gb"] = None
+        rows.append(row)
+
     return render(request, "app/dashboard.html", session=session,
-                  instances=instances, invoices=invoices, info=info,
-                  headroom=headroom(info),
-                  allocation=allocation(),
+                  rows=rows, usage=usage, invoices=invoices,
                   templates=provision.template_list(),
                   running_jobs=tasks.running())
 
