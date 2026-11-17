@@ -18,6 +18,9 @@
       <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
     </div>
 
+    {# On a phone this is where the primary action belongs, not in the title bar. #}
+    <a class="btn btn-primary side-cta" href="/app/instances/new">Nouvelle instance</a>
+
     {% if user['role'] == 'admin' %}
       <div class="nav-label">Exploitation</div>
       <a class="nav {{ 'active' if path == '/admin' }}" href="/admin">Vue d'ensemble</a>
@@ -57,12 +60,18 @@
         {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting</span>{% endblock %}
         <h1>{% block heading %}{{ app_name }}{% endblock %}</h1>
       </div>
-      <div class="row tight">
+      <div class="topbar-actions">
         {% block actions %}{% endblock %}
         <a class="btn btn-primary btn-sm" href="/app/instances/new">Nouvelle instance</a>
       </div>
     </header>
     <div class="content {% block content_class %}{% endblock %}">
+      {# The title bar carries the menu button and the heading only on a phone,
+         so the page's own actions are rendered here instead. #}
+      <div class="content-actions">
+        {{ self.actions() }}
+        <a class="btn btn-primary btn-sm" href="/app/instances/new">Nouvelle instance</a>
+      </div>
       {% include "partials/flash.html" %}
       {% block content %}{% endblock %}
     </div>
