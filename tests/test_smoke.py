@@ -93,6 +93,31 @@ class TestTemplates(unittest.TestCase):
         # With a key present, password auth must be off.
         self.assertIn("PasswordAuthentication no", script)
 
+    def test_a_machine_reports_its_plan_not_the_host(self):
+        # neofetch reads the host's CPU model and DMI tables, which are the same
+        # on every instance. The config must name the plan instead, and name it
+        # through a variable: neofetch's info() expands ${!arg}, so a literal is
+        # silently dropped rather than printed.
+        for slug, expected in (("starter", "orion_small"),
+                               ("standard", "orion_standard"),
+                               ("pro", "orion_pro"),
+                               ("business", "orion_business")):
+            self.assertEqual(provision.plan_code({"slug": slug}), expected)
+        # An unlisted plan still gets a name; a missing one does not explode.
+        self.assertEqual(provision.plan_code({"slug": "custom-2"}), "orion_custom_2")
+        self.assertEqual(provision.plan_code({"name": "no slug here"}), "orion_custom")
+        self.assertEqual(provision.plan_code(None), "orion_custom")
+
+        script = provision.build_script(
+            template="docker", hostname="demo", ssh_user="orion", password="pw",
+            authorized_keys="", plan={"slug": "standard", "name": "Standard", "vcpu": 1,
+                                      "memory_mb": 1024, "disk_gb": 10},
+            brand="node29", base_url="https://hosting.node29.fr", domain_suffix="",
+        )
+        self.assertIn('orion_plan="orion_standard"', script)
+        self.assertIn("info \"Host\" orion_plan", script)
+        self.assertNotIn("i5-6500", script)
+
     def test_script_without_key_keeps_password_auth(self):
         plan = {"name": "Starter", "vcpu": 1, "memory_mb": 512, "disk_gb": 5}
         script = provision.build_script(

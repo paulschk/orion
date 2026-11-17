@@ -275,44 +275,6 @@
   </div>
 </div>
 
-<div class="grid cols-2" style="align-items:start">
-  <div class="card">
-    <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
-    {% if snapshots %}
-    <div class="stack">
-      {% for snap in snapshots %}
-      <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border-soft)">
-        <div>
-          <div class="mono small">{{ snap['name'] }}</div>
-          <div class="tiny dim">{{ snap['created_at'][:19].replace('T', ' ') }}</div>
-        </div>
-        <div class="row tight">
-          <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/restore" class="inline-form">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button class="btn btn-sm">Restaurer</button>
-          </form>
-          <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/delete" class="inline-form">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button class="btn btn-sm btn-ghost">×</button>
-          </form>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-      <p class="small dim">Aucun instantané. Prenez-en un avant toute mise à jour risquée.</p>
-    {% endif %}
-    <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots" class="mt3">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <div class="row tight">
-        <input class="input grow" name="label" placeholder="avant-maj-nginx">
-        <button class="btn">Créer un instantané</button>
-      </div>
-    </form>
-  </div>
-
-</div>
-
 <div class="card">
   <div class="card-h">
     <h2>Terminal</h2>
@@ -325,6 +287,43 @@
     Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
     fonctionnent. Chaque ouverture de session est journalisée.
   </p>
+</div>
+
+{# Directly below the terminal: a snapshot is what you take before running
+   something in there. #}
+<div class="card">
+  <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
+  {% if snapshots %}
+  <div class="stack">
+    {% for snap in snapshots %}
+    <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border-soft)">
+      <div>
+        <div class="mono small">{{ snap['name'] }}</div>
+        <div class="tiny dim">{{ snap['created_at'][:19].replace('T', ' ') }}</div>
+      </div>
+      <div class="row tight">
+        <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/restore" class="inline-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-sm">Restaurer</button>
+        </form>
+        <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/delete" class="inline-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-sm btn-ghost">×</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="small dim">Aucun instantané. Prenez-en un avant toute mise à jour risquée.</p>
+  {% endif %}
+  <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots" class="mt3">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row tight">
+      <input class="input grow" name="label" placeholder="avant-maj-nginx">
+      <button class="btn">Créer un instantané</button>
+    </div>
+  </form>
 </div>
 
 <div class="card">

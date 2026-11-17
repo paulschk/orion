@@ -75,6 +75,35 @@ def template_list() -> list[Template]:
 
 # --------------------------------------------------------------------------- script base
 
+# What a machine says it is when asked. The hardware underneath belongs to the
+# host, is identical on every instance, and is not what the client rented - so
+# the plan stands in for it. Keyed by plan slug; anything unlisted is spelled
+# out as orion_<slug>.
+PLAN_CODES = {
+    "starter": "orion_small",
+    "standard": "orion_standard",
+    "pro": "orion_pro",
+    "business": "orion_business",
+}
+
+
+def plan_code(plan) -> str:
+    """The public name of the plan an instance is on.
+
+    A plan is a sqlite3.Row in production and often a plain dict in tests, and
+    not every caller passes a slug, so a missing key is normal rather than an
+    error.
+    """
+    if not plan:
+        return "orion_custom"
+    try:
+        slug = (plan["slug"] or "")
+    except (KeyError, IndexError, TypeError):
+        return "orion_custom"
+    slug = slug.strip().lower().replace("-", "_")
+    return PLAN_CODES.get(slug) or ("orion_" + slug if slug else "orion_custom")
+
+
 BASE_SCRIPT = r"""#!/bin/bash
 # Orion provisioning script - generated, do not edit in place.
 set -euo pipefail
@@ -148,6 +177,64 @@ cat > /etc/motd <<'ORION_MOTD'
   ------------------------------------------------------------------
 
 ORION_MOTD
+
+step "Concealing the host hardware"
+# neofetch reads /proc/cpuinfo and the DMI tables, both of which describe the
+# host - the same CPU model and the same machine name on every instance, which
+# is exactly what a client should not be handed when they ask their server what
+# it is. It reports the plan instead.
+apt-get install -y -qq --no-install-recommends neofetch >/dev/null 2>&1 || true
+install -d -m 0755 /etc/orion
+
+# Start from neofetch's own default config so nothing it expects is missing,
+# then redefine what it prints. The last definition of print_info wins.
+if [ -x /usr/bin/neofetch ]; then
+  /usr/bin/neofetch --print_config > /etc/orion/neofetch.conf 2>/dev/null || true
+fi
+
+cat >> /etc/orion/neofetch.conf <<'ORION_NEOFETCH'
+
+# --- what this machine is, as far as its owner is concerned -------------------
+# neofetch's info() does not take a string: it takes the NAME of a variable and
+# expands ${!name}, printing nothing at all if that variable is unset. Passing
+# a literal silently drops the line instead of showing it, so the identity lives
+# in variables and the lines below reference them.
+#
+# Everything shown is either the plan or something the instance can vouch for
+# itself - uptime, its shell, its own memory and disk quota. Nothing is read
+# from the host.
+orion_plan="@@PLAN_CODE@@"
+orion_cpu="@@PLAN_CODE@@ (@@PLAN_VCPU@@ vCPU)"
+
+print_info() {
+    info title
+    info underline
+    info "OS" distro
+    info "Host" orion_plan
+    info "Kernel" kernel
+    info "Uptime" uptime
+    info "Shell" shell
+    info "CPU" orion_cpu
+    info "Memory" memory
+    info "Disk" disk
+    info cols
+}
+ORION_NEOFETCH
+
+# A wrapper earlier in PATH, so that rewriting ~/.config/neofetch/config.conf
+# changes nothing. Passing --config explicitly still wins - that is a deliberate
+# choice by the person, not something to defeat.
+cat > /usr/local/bin/neofetch <<'ORION_NEOFETCH_WRAPPER'
+#!/bin/sh
+# Report the plan that was rented, not the hardware it runs on.
+# The panel owns /etc/orion/neofetch.conf and rewrites it on reinstall.
+if [ ! -x /usr/bin/neofetch ]; then
+  echo "neofetch is not installed" >&2
+  exit 127
+fi
+exec /usr/bin/neofetch --config /etc/orion/neofetch.conf "$@"
+ORION_NEOFETCH_WRAPPER
+chmod 0755 /usr/local/bin/neofetch
 """
 
 # --------------------------------------------------------------------------- template bodies
@@ -446,6 +533,7 @@ def build_script(*, template: str, hostname: str, ssh_user: str, password: str,
         "@@PLAN_VCPU@@": str(plan["vcpu"] if plan else "-"),
         "@@PLAN_RAM@@": str(plan["memory_mb"] if plan else "-"),
         "@@PLAN_DISK@@": str(plan["disk_gb"] if plan else "-"),
+        "@@PLAN_CODE@@": plan_code(plan),
         "@@CREATED_AT@@": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "@@WPADMIN@@": wp_admin,
         "@@WPPASS@@": wp_pass,
