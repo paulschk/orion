@@ -263,6 +263,7 @@ def migrate() -> None:
     """
     from . import identity
 
+    added_primary = False
     with cursor(commit=True) as cur:
         if "machine_id" not in _columns(cur, "instances"):
             cur.execute("ALTER TABLE instances ADD COLUMN machine_id TEXT NOT NULL DEFAULT ''")
@@ -280,14 +281,20 @@ def migrate() -> None:
         if "is_primary" not in site_columns:
             cur.execute("ALTER TABLE sites ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
             print("[orion] schema: added sites.is_primary")
+            added_primary = True
+        else:
+            added_primary = False
 
-    # Backfill: the site whose domain is the instance's generated name is the
-    # instance's own address. Tracking that explicitly means renaming it later
-    # does not make it look like a client-supplied domain.
-    for row in query("SELECT s.id, s.domain, i.slug FROM sites s "
-                     "JOIN instances i ON i.id = s.instance_id"):
-        if row["domain"].startswith(f"{row['slug']}."):
-            execute("UPDATE sites SET is_primary = 1 WHERE id = ?", (row["id"],))
+    # One-shot backfill: the site whose domain is exactly the instance's
+    # generated name is the instance's own address. It must run only when the
+    # column appears. Re-running it on every boot silently re-promotes whatever
+    # route a client happens to have under their instance's own name - including
+    # one they pointed at a port where nothing listens.
+    if added_primary:
+        for row in query("SELECT s.id, s.domain, i.slug FROM sites s "
+                         "JOIN instances i ON i.id = s.instance_id"):
+            if row["domain"] == f"{row['slug']}.{settings.domain}":
+                execute("UPDATE sites SET is_primary = 1 WHERE id = ?", (row["id"],))
 
     # The SSH port must be unique: two instances provisioning at once used to
     # pick the same one and the second failed to bind its proxy device.

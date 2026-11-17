@@ -242,6 +242,22 @@
   </details>
 </div>
 
+{# The non-technical path: the panel looks at what is actually listening in the
+   instance and offers it, instead of asking for an upstream port. Loaded after
+   the page so the scan never delays it. #}
+<div class="card">
+  <div class="card-h">
+    <h2>Publier un service</h2>
+    <span class="sub">détecté dans votre instance</span>
+  </div>
+  <div id="instance-services"
+       hx-get="/app/instances/{{ instance['id'] }}/services"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <p class="small dim">Recherche des services en cours…</p>
+  </div>
+</div>
+
 <div class="grid cols-2" style="align-items:start">
   <div class="card">
     <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>

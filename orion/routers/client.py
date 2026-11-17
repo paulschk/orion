@@ -6,10 +6,10 @@ import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from urllib.parse import quote
 
-from .. import activity, billing, db, identity, provision, sites, tasks
+from .. import activity, billing, db, identity, provision, services, sites, tasks
 from ..config import settings
 from ..deps import client_ip, fint, fstr, guard_csrf, require_user
 from ..hostinfo import detect, fits, headroom
@@ -461,6 +461,67 @@ async def site_make_primary(request: Request, site_id: int):
     message = f"{site['domain']} est désormais l'adresse principale de {site['slug']}."
     return RedirectResponse(
         f"/app/instances/{site['instance_id']}?ok={quote(message)}", status_code=303)
+
+
+@router.get("/instances/{instance_id}/services")
+async def instance_services(request: Request, instance_id: int):
+    """The discoverable services, loaded after the page so a scan never delays it."""
+    session = require_user(request)
+    instance = _owned(instance_id, session)
+    if instance is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    rows = sites.list_sites(instance_id)
+    listening = services.listening_ports(instance["incus_name"])
+    return render(request, "partials/instance_services.html", session=session,
+                  instance=instance,
+                  found=services.discover(instance),
+                  published={row["upstream"]: row for row in rows},
+                  orphan_rows=[row for row in rows if row["upstream"] not in listening],
+                  default_domain=sites.default_domain(instance["slug"]),
+                  tenant_domain=settings.domain)
+
+
+@router.post("/instances/{instance_id}/services/publish")
+async def service_publish(request: Request, instance_id: int):
+    """Put one of the client's ports on the internet, in one click."""
+    session = require_user(request)
+    form = await request.form()
+    guard_csrf(request, session, form)
+    instance = _owned(instance_id, session)
+    if instance is None:
+        return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
+
+    port = fint(form, "port")
+    if not 1 <= port <= 65535:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote('Port invalide.')}", status_code=303)
+
+    # Re-checked here rather than trusted from the form: the client may have
+    # stopped the service between the scan and the click, and a route to a dead
+    # port is a 502 they would have to debug themselves.
+    if port not in services.listening_ports(instance["incus_name"]):
+        message = f"Rien n'écoute sur le port {port} dans votre instance pour le moment."
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(message)}", status_code=303)
+
+    domain = services.address_for(instance["slug"], port, settings.domain)
+    clash = db.one("SELECT * FROM sites WHERE domain = ?", (domain,))
+    if clash is not None and clash["instance_id"] != instance_id:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(domain + ' est déjà utilisé.')}",
+            status_code=303)
+
+    sites.add_site(instance_id, domain, port, primary=(port == 80))
+    ok, message = sites.sync_caddy()
+    activity.log("service.publish", user_id=session["uid"], target=domain,
+                 detail=f"port {port}")
+    if not ok:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
+            status_code=303)
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok={quote(domain + f' publie le port {port}')}",
+        status_code=303)
 
 
 @router.post("/instances/{instance_id}/subdomain")
