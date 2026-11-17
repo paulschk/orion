@@ -145,14 +145,8 @@
       </details>
     {% else %}
       <p class="small muted mt2">
-        {% if site_rows %}
-          Cette instance route déjà {{ site_rows|length }} adresse{{ 's' if site_rows|length > 1 }} —
-          la liste est en mode avancé ci-dessous. Vous pouvez aussi activer son adresse d'origine,
-          incluse dans toutes les offres.
-        {% else %}
-          Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
-          Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
-        {% endif %}
+        Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
+        Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
       </p>
       <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt2">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -163,7 +157,58 @@
     {% endif %}
   </div>
 
-  <details class="advanced mt3" {{ 'open' if custom_sites }}>
+  {# The route list stays on screen. It used to sit inside the advanced section,
+     so an instance with a single address showed no routing at all. #}
+  <div class="mt3" style="border-top:1px solid var(--border);padding-top:16px">
+    <div class="spread">
+      <div class="small" style="font-weight:600">Les adresses de cette instance</div>
+      <span class="tiny dim">une ligne par service publié</span>
+    </div>
+    {% if site_rows %}
+    <div class="table-wrap mt2">
+      <table class="table">
+        <thead>
+          <tr><th>Adresse</th><th>Port local</th><th>Rôle</th><th class="num"></th></tr>
+        </thead>
+        <tbody>
+          {% for s in site_rows %}
+          <tr>
+            <td class="mono small">
+              <a href="https://{{ s['domain'] }}" target="_blank" rel="noopener">{{ s['domain'] }}</a>
+            </td>
+            <td class="mono small">:{{ s['upstream'] }}</td>
+            <td class="small">
+              {% if default_site and s['id'] == default_site['id'] %}
+                <span class="badge idle">principale</span>
+              {% else %}<span class="dim">—</span>{% endif %}
+            </td>
+            <td class="num">
+              <span class="row tight" style="justify-content:flex-end">
+                <button class="btn btn-sm btn-ghost" data-copy="https://{{ s['domain'] }}">Copier</button>
+                {% if not (default_site and s['id'] == default_site['id']) %}
+                <form method="post" action="/app/sites/{{ s['id'] }}/primary" class="inline-form">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn btn-sm btn-ghost"
+                          title="Afficher cette adresse dans la partie simple">Principale</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn btn-sm btn-ghost">Retirer</button>
+                </form>
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="small dim mt2">Aucune adresse pour l'instant.</p>
+    {% endif %}
+  </div>
+
+  <details class="advanced mt3">
     <summary>Mode avancé — utiliser un nom de domaine à vous</summary>
     <p class="small muted mt2">
       Déclarez votre domaine ci-dessous, puis créez chez votre registrar les enregistrements
@@ -211,34 +256,6 @@
       </div>
       <button class="btn">Router ce domaine</button>
     </form>
-
-    {% if custom_sites %}
-    <div class="table-wrap mt3">
-      <table class="table">
-        <thead><tr><th>Domaine ajouté</th><th>Port</th><th class="num"></th></tr></thead>
-        <tbody>
-          {% for s in custom_sites %}
-          <tr>
-            <td class="mono small">{{ s['domain'] }}</td>
-            <td class="mono small">:{{ s['upstream'] }}</td>
-            <td class="num">
-              <span class="row tight" style="justify-content:flex-end">
-                <form method="post" action="/app/sites/{{ s['id'] }}/primary" class="inline-form">
-                  <input type="hidden" name="csrf" value="{{ csrf }}">
-                  <button class="btn btn-sm btn-ghost" title="Afficher cette adresse en mode simple">Principale</button>
-                </form>
-                <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
-                  <input type="hidden" name="csrf" value="{{ csrf }}">
-                  <button class="btn btn-sm btn-ghost">Retirer</button>
-                </form>
-              </span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
   </details>
 </div>
 

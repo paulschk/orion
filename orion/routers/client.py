@@ -103,13 +103,16 @@ def instance_context(instance, *, deep: bool = True) -> dict:
             plan_memory = f"{row['memory_mb']} MB"
 
     site_rows = sites.list_sites(instance["id"])
-    default_site = next((s for s in site_rows if s["is_primary"]), None)
-    if default_site is None:
-        # Older rows, or an instance whose site has not been created yet.
-        default_domain = sites.default_domain(instance["slug"])
-        default_site = next((s for s in site_rows if s["domain"] == default_domain), None)
-    else:
-        default_domain = default_site["domain"]
+    default_site = next((row for row in site_rows if row["is_primary"]), None)
+    if default_site is None and site_rows:
+        # Nothing is marked as the instance's own address - typically because it
+        # was removed. Prefer one that actually answers over one that may lead
+        # nowhere, and only pay for the scan in this case.
+        listening = services.listening_ports(instance["incus_name"])
+        default_site = (next((row for row in site_rows if row["upstream"] in listening), None)
+                        or site_rows[0])
+    default_domain = (default_site["domain"] if default_site
+                      else sites.default_domain(instance["slug"]))
     job = tasks.latest_for_instance(instance["id"])
     return {
         "instance": instance,
