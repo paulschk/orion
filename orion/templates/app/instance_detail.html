@@ -46,6 +46,16 @@
       <dt>Créée le</dt><dd>{{ instance['created_at'][:10] }}</dd>
       <dt>Renouvellement</dt><dd>{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</dd>
     </dl>
+
+    {# This card is tall because the access card beside it is; the space is
+       where a client looks for what the instance is consuming. Polled on its
+       own so a slow measurement never delays the page. #}
+    <div class="mt3" id="instance-metrics"
+         hx-get="/app/instances/{{ instance['id'] }}/metrics"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+      {% include "partials/instance_metrics.html" %}
+    </div>
   </div>
 
   <div class="card">
@@ -190,7 +200,23 @@
           {% for s in site_rows %}
           <tr>
             <td class="mono small">
+              {% if s['domain'].endswith('.' + tenant_domain) %}
+              {% set suffix_len = tenant_domain|length + 1 %}
+              {# Edited in place rather than deleted and recreated, which would
+                 take the address offline for as long as it takes Caddy to reload. #}
+              <form method="post"
+                    action="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+                    class="row tight">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input class="input input-sm mono" name="label" aria-label="Nom de l'adresse"
+                       value="{{ s['domain'][:-suffix_len] }}" style="width:11rem"
+                       spellcheck="false" autocapitalize="off">
+                <span class="dim">.{{ tenant_domain }}</span>
+                <button class="btn btn-sm btn-ghost" title="Renommer cette adresse">Renommer</button>
+              </form>
+              {% else %}
               <a href="https://{{ s['domain'] }}" target="_blank" rel="noopener">{{ s['domain'] }}</a>
+              {% endif %}
             </td>
             <td class="mono small">:{{ s['upstream'] }}</td>
             <td class="small">
@@ -282,10 +308,19 @@
   <div class="card-h">
     <h2>Publier un service</h2>
     <span class="sub">détecté dans votre instance</span>
+    <button class="btn btn-sm btn-ghost" style="margin-left:auto"
+            title="Relancer la détection maintenant"
+            hx-get="/app/instances/{{ instance['id'] }}/services"
+            hx-target="#instance-services" hx-swap="innerHTML"
+            hx-indicator="#svc-busy">
+      <span id="svc-busy" class="spinner htmx-indicator" aria-hidden="true"></span>Rafraîchir
+    </button>
   </div>
+  {# The list re-scans on its own once a minute, so a service started after the
+     page was opened turns up without a reload; the button makes it immediate. #}
   <div id="instance-services"
        hx-get="/app/instances/{{ instance['id'] }}/services"
-       hx-trigger="load"
+       hx-trigger="load, every 60s"
        hx-swap="innerHTML">
     <p class="small dim">Recherche des services en cours…</p>
   </div>

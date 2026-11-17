@@ -209,6 +209,12 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); bo
 .bar { height: 7px; border-radius: 999px; background: var(--border-soft); overflow: hidden; margin-top: 10px; }
 .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .6s cubic-bezier(.4, 0, .2, 1); }
 .bar.ok > span { background: #4ade80; }
+.metric { margin-top: 14px; }
+.metric .bar { margin-top: 7px; }
+.input-sm { padding: 5px 9px; font-size: .82rem; }
+.htmx-indicator { opacity: 0; transition: opacity .15s ease-in; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+#svc-busy { width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; }
 .bar.warn > span { background: #fbbf24; }
 .bar.bad > span { background: #f87171; }
 

@@ -1,0 +1,37 @@
+{% macro bar_row(label, pct, detail) %}
+  {% if pct is none %}{% set tone = '' %}{% set width = '0' %}
+  {% elif pct >= 90 %}{% set tone = 'bad' %}{% set width = '%.1f'|format(pct) %}
+  {% elif pct >= 70 %}{% set tone = 'warn' %}{% set width = '%.1f'|format(pct) %}
+  {% else %}{% set tone = 'ok' %}{% set width = '%.1f'|format(pct) %}{% endif %}
+  <div class="metric">
+    <div class="spread">
+      <span class="tiny dim">{{ label }}</span>
+      <span class="tiny mono">{{ detail }}</span>
+    </div>
+    <div class="bar {{ tone }}"><span style="width:{{ width }}%"></span></div>
+  </div>
+{% endmacro %}
+
+{% if not m %}
+  <p class="tiny dim">Lecture en cours…</p>
+{% elif not m.get('memory_total') and not m.get('disk_total') %}
+  <p class="tiny dim">Aucune mesure : l'instance n'est pas en marche.</p>
+{% else %}
+  {% set cpu = m.get('cpu_pct') %}
+  {% set cpu_detail = '%.0f %%'|format(cpu) if cpu is not none
+                      else ('calcul…' if not m.get('cpu_ready') else '—') %}
+  {% set mem_pct = (m['memory_used'] / m['memory_total'] * 100) if m.get('memory_total') else none %}
+  {% set mem_detail = '%d Mo sur %d Mo'|format(m['memory_used'] // 1048576,
+                                               m['memory_total'] // 1048576)
+                      if m.get('memory_total') else '—' %}
+  {% set disk_pct = (m['disk_used'] / m['disk_total'] * 100) if m.get('disk_total') else none %}
+  {% set disk_detail = '%.1f Go sur %.1f Go'|format(m['disk_used'] / 1073741824,
+                                                    m['disk_total'] / 1073741824)
+                       if m.get('disk_total') else '—' %}
+  {{ bar_row('Processeur', cpu, cpu_detail) }}
+  {{ bar_row('Mémoire', mem_pct, mem_detail) }}
+  {{ bar_row('Stockage', disk_pct, disk_detail) }}
+  <p class="tiny dim mt2" title="Moyenne depuis la mesure précédente, rapportée à vos vCPU.">
+    Utilisation rapportée aux ressources de cette instance.
+  </p>
+{% endif %}

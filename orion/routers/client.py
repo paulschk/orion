@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from urllib.parse import quote
 
-from .. import activity, billing, db, identity, provision, services, sites, tasks
+from .. import activity, billing, db, identity, metrics, provision, services, sites, tasks
 from ..config import settings
 from ..deps import client_ip, fint, fstr, guard_csrf, require_user
 from ..hostinfo import detect, fits, headroom
@@ -80,19 +80,23 @@ def _job_steps(job) -> list[str]:
 
 def instance_context(instance, *, deep: bool = True) -> dict:
     """Everything the instance page needs, degrading gracefully if Incus is down."""
-    metrics = {}
+    figures = {}
     live_status = instance["status"]
     snapshot_rows: list = []
     if deep and instance["status"] not in ("destroyed",):
         try:
             state = incus.state(instance["incus_name"])
             live_status = (state.get("status") or live_status).lower()
-            metrics = {
+            figures = {
                 "memory_used": (state.get("memory") or {}).get("usage", 0),
                 "memory_peak": (state.get("memory") or {}).get("usage_peak", 0),
                 "cpu_ns": (state.get("cpu") or {}).get("usage", 0),
                 "processes": state.get("processes", 0),
             }
+            # Seed the CPU counter now, so the metrics card's first poll has a
+            # reading to difference against instead of showing a dash for ten
+            # seconds. Incus publishes CPU as a cumulative counter, not a rate.
+            metrics.remember(instance["incus_name"], figures["cpu_ns"])
             snapshot_rows = incus.snapshots(instance["incus_name"])
         except IncusError:
             pass
@@ -116,7 +120,7 @@ def instance_context(instance, *, deep: bool = True) -> dict:
     job = tasks.latest_for_instance(instance["id"])
     return {
         "instance": instance,
-        "metrics": metrics,
+        "metrics": figures,
         "live_status": live_status,
         "memory_cap": plan_memory,
         "snapshots": snapshot_rows,
@@ -527,6 +531,129 @@ async def service_publish(request: Request, instance_id: int):
         status_code=303)
 
 
+# Labels that must never become a tenant address: they either collide with
+# something we serve ourselves or with the plumbing every registrar punishes.
+RESERVED_LABELS = {
+    "www", "mail", "smtp", "imap", "pop", "ftp", "ns", "ns1", "ns2", "dns",
+    "admin", "panel", "api", "ssh", "host", "hosting", "webmail", "cpanel",
+    "localhost", "autodiscover", "autoconfig", "vpn", "git", "status", "static",
+}
+
+_LABEL_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789-")
+
+
+def label_problem(label: str, *, instance_id: int, site_id: int | None = None) -> str:
+    """Why this subdomain label cannot be used, or '' when it can.
+
+    Both callers - the simple-mode rename and the per-address rename - ask here,
+    so the two cannot drift apart on what "already taken" means.
+    """
+    if not label:
+        return "Indiquez un nom."
+    if len(label) > 63:
+        return "Un nom ne peut pas dépasser 63 caractères."
+    if label.startswith("-") or label.endswith("-") or not set(label) <= _LABEL_CHARS:
+        return ("Lettres minuscules, chiffres et tirets uniquement — "
+                "sans tiret au début ni à la fin.")
+    if label in RESERVED_LABELS:
+        return f"« {label} » est réservé par le système."
+
+    domain = f"{label}.{settings.domain}"
+    taken = db.one(
+        "SELECT s.id, s.instance_id, i.slug FROM sites s "
+        "JOIN instances i ON i.id = s.instance_id WHERE s.domain = ?", (domain,))
+    if taken and taken["id"] != site_id:
+        if taken["instance_id"] == instance_id:
+            return f"{domain} est déjà une adresse de cette instance."
+        return f"{domain} est déjà utilisé par l'instance {taken['slug']}."
+
+    # Another live instance generates this exact address for itself the day it is
+    # published, so handing it out now would collide later.
+    clash = db.one("SELECT slug FROM instances WHERE slug = ? AND id != ? "
+                   "AND status != 'destroyed'", (label, instance_id))
+    if clash:
+        return f"« {label} » est le nom d'une autre instance — choisissez-en un autre."
+    return ""
+
+
+@router.get("/instances/{instance_id}/metrics")
+async def instance_metrics(request: Request, instance_id: int):
+    """CPU, memory and storage for the state card. Polled, so it stays cheap."""
+    session = require_user(request)
+    instance = _owned(instance_id, session)
+    if instance is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    figures = {}
+    if instance["status"] not in ("destroyed", "provisioning"):
+        plan = (db.one("SELECT memory_mb, vcpu FROM plans WHERE id = ?", (instance["plan_id"],))
+                if instance["plan_id"] else None)
+        try:
+            figures = metrics.sample(
+                instance["incus_name"],
+                memory_mb=(plan["memory_mb"] if plan else 0),
+                vcpu=(plan["vcpu"] if plan else 1),
+                state=incus.state(instance["incus_name"]),
+            )
+        except IncusError:
+            figures = {}
+    return render(request, "partials/instance_metrics.html", session=session, m=figures)
+
+
+@router.post("/instances/{instance_id}/sites/{site_id}/rename")
+async def site_rename(request: Request, instance_id: int, site_id: int):
+    """Give a published address a name of the client's own choosing."""
+    session = require_user(request)
+    form = await request.form()
+    guard_csrf(request, session, form)
+    instance = _owned(instance_id, session)
+    if instance is None:
+        return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
+
+    site = db.one("SELECT * FROM sites WHERE id = ?", (site_id,))
+    if site is None or site["instance_id"] != instance_id:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err=" + quote("Adresse introuvable"), status_code=303)
+
+    suffix = f".{settings.domain}"
+    if not site["domain"].endswith(suffix):
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err="
+            + quote("Un nom de domaine personnel se change chez votre registrar."),
+            status_code=303)
+
+    previous = site["domain"]
+    current = previous[:-len(suffix)]
+    label = slugify(fstr(form, "label"))
+    if label == current:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?ok=Adresse+inchang%C3%A9e", status_code=303)
+
+    problem = label_problem(label, instance_id=instance_id, site_id=site_id)
+    if problem:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(problem)}", status_code=303)
+
+    domain = f"{label}{suffix}"
+    try:
+        db.execute("UPDATE sites SET domain = ? WHERE id = ?", (domain, site_id))
+    except sqlite3.IntegrityError:
+        # The checks above can lose a race against a create in another tab.
+        detail = f"{domain} vient d'être pris par une autre instance."
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(detail)}", status_code=303)
+
+    ok, message = sites.sync_caddy()
+    activity.log("site.renamed", user_id=session["uid"], target=domain, detail=previous)
+    if not ok:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
+            status_code=303)
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok={quote(previous + ' devient ' + domain)}",
+        status_code=303)
+
+
 @router.post("/instances/{instance_id}/subdomain")
 async def subdomain_set(request: Request, instance_id: int):
     """Simple mode: change only the label of the instance's own subdomain."""
@@ -538,18 +665,14 @@ async def subdomain_set(request: Request, instance_id: int):
         return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
 
     label = slugify(fstr(form, "label"))
-    if not label or label in ("www", "mail", "ftp", "ns", "admin"):
+    primary = db.one("SELECT * FROM sites WHERE instance_id = ? AND is_primary = 1", (instance_id,))
+    problem = label_problem(label, instance_id=instance_id,
+                            site_id=(primary["id"] if primary else None))
+    if problem:
         return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote('Sous-domaine invalide.')}", status_code=303)
+            f"/app/instances/{instance_id}?err={quote(problem)}", status_code=303)
 
     domain = f"{label}.{settings.domain}"
-    clash = db.one("SELECT * FROM sites WHERE domain = ?", (domain,))
-    if clash is not None and clash["instance_id"] != instance_id:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(f'{domain} est déjà utilisé par une autre instance.')}",
-            status_code=303)
-
-    primary = db.one("SELECT * FROM sites WHERE instance_id = ? AND is_primary = 1", (instance_id,))
     if primary is None:
         sites.add_site(instance_id, domain, 80, primary=True)
     else:
