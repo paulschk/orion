@@ -166,7 +166,15 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); bo
 }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 textarea.input { min-height: 90px; resize: vertical; font-family: var(--mono); font-size: 0.86rem; }
-select.input { appearance: none; background-image: none; }
+select.input {
+  appearance: none;
+  padding-right: 34px;
+  /* Replaces the native chevron that `appearance: none` removes. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23c4a882' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 11px;
+}
 .checkline { display: flex; align-items: center; gap: 9px; font-size: 0.9rem; }
 .checkline input { width: 16px; height: 16px; accent-color: var(--accent); }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px; }
@@ -190,7 +198,13 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   background: var(--bg-alt); border-right: 1px solid var(--border);
   padding: 18px 14px; display: flex; flex-direction: column; gap: 4px;
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.side::-webkit-scrollbar { width: 8px; }
+.side::-webkit-scrollbar-track { background: transparent; }
+.side::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+.side::-webkit-scrollbar-thumb:hover { background: var(--tag-bg); }
 .side .brand { padding: 6px 10px 16px; }
 .side .brand .logo { font-size: 1.12rem; }
 .side .brand .role {

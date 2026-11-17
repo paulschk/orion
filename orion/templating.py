@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from . import __version__
 from .config import settings
 from .util import human_bytes, human_mb, money, pretty_date, pretty_datetime, slugify
 
@@ -24,6 +25,8 @@ templates.env.filters.update({
 })
 
 templates.env.globals.update(
+    # Bump the ?v= on every release, or returning visitors keep the old CSS/JS.
+    asset_version=__version__,
     brand=settings.brand,
     app_name=settings.app_name,
     domain=settings.domain,
