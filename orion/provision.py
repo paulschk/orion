@@ -87,6 +87,16 @@ PLAN_CODES = {
 }
 
 
+# The ordered progress thresholds the provisioning script walks through, one
+# entry per phase. They are the source of truth for "step N of M" in the panel.
+# Counting the `progress()` *calls* would not do: two of them are branches of the
+# same phase (a container being created or reused), so the count would drift by
+# one depending on the host's state. The thresholds are unique, so the count is
+# stable whatever the branch.
+PHASE_STEPS = (3, 8, 15, 30, 40, 50, 58, 94, 100)
+STEP_TOTAL = len(PHASE_STEPS)
+
+
 def plan_code(plan) -> str:
     """The public name of the plan an instance is on.
 

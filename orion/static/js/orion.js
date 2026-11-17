@@ -151,8 +151,8 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 })();
 
 // The provisioning loader is replaced every couple of seconds. Two things have
-// to survive that. The bar must never go backwards: a step that happens to
-// report a smaller number reads as the installation starting over, and the
+// to survive that. The step count must never go backwards - a phase that
+// reports a lower number reads as the installation starting over - and the
 // previous value is only in the DOM that htmx has just thrown away, so it is
 // kept here keyed by instance. And the log must stay pinned to its end, unless
 // the reader has scrolled up to look at something.
@@ -160,20 +160,19 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 // so anything written onto the element is gone exactly when it is needed. The
 // follow flag especially - a reader who has scrolled up to read something must
 // not be yanked back to the end two seconds later.
-const progressSeen = new Map();
+const stepSeen = new Map();
 const logFollowing = new Map();
 
 function holdProgress() {
   const box = document.getElementById('instance-progress');
   if (!box) return;
   const key = box.dataset.instanceId || '';
-  const fill = box.querySelector('.bar > span[data-target]');
-  if (fill) {
-    const wanted = Math.max(parseInt(fill.dataset.target, 10) || 0, progressSeen.get(key) || 0);
-    progressSeen.set(key, wanted);
-    fill.style.width = wanted + '%';
-    const pct = box.querySelector('.loader-pct');
-    if (pct) pct.textContent = wanted + '%';
+  const count = box.querySelector('.loader-count');
+  if (count) {
+    const shown = parseInt(count.dataset.step, 10) || 0;
+    const wanted = Math.max(shown, stepSeen.get(key) || 0);
+    stepSeen.set(key, wanted);
+    if (wanted !== shown) count.textContent = count.dataset.pattern.replace('{n}', wanted);
   }
   const log = box.querySelector('.loader-log');
   if (log && logFollowing.get(key) !== false) log.scrollTop = log.scrollHeight;

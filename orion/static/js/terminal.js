@@ -204,11 +204,21 @@
   // the pane ends up 2px short (the borders), the next measurement no longer
   // fits the last row, and the terminal folds itself away a line at a time.
   const TARGET_HEIGHT = 460;
+  const BASE_PAD = 8;      // the stylesheet's own bottom padding
+  // A few rows of clearance under the last line. The prompt lives on the final
+  // row of the screen, and with the pane snapped flush to that row it sat
+  // against the pane's bottom edge - which reads as though it were falling out
+  // of the window, and is impossible to see when the pane's foot is at the
+  // window's foot. Three rows lift it clear without giving up a single line of
+  // scrollback.
+  const EXTRA_ROWS = 3;
+  // `fixed` deliberately does not read padding-bottom: that is the value this
+  // function writes, so feeding it back is the loop that folds the pane.
   function fitToWholeRows() {
     const screen = pane.querySelector('.xterm-screen');
     if (!screen) return;
     const style = getComputedStyle(pane);
-    const chrome = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
+    const fixed = BASE_PAD + ['paddingTop', 'borderTopWidth', 'borderBottomWidth']
       .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
 
     const cell = term.rows > 0 ? screen.getBoundingClientRect().height / term.rows : 0;
@@ -216,10 +226,13 @@
 
     const proposal = fit.proposeDimensions && fit.proposeDimensions();
     const cols = (proposal && proposal.cols) || term.cols;
-    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - chrome) / cell));
+    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - fixed) / cell));
+
+    const padBottom = Math.round(BASE_PAD + EXTRA_ROWS * cell);
+    if (pane.style.paddingBottom !== padBottom + 'px') pane.style.paddingBottom = padBottom + 'px';
 
     if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
-    const wanted = Math.round(rows * cell + chrome) + 'px';
+    const wanted = Math.round(rows * cell + fixed + EXTRA_ROWS * cell) + 'px';
     if (pane.style.height !== wanted) pane.style.height = wanted;
   }
 

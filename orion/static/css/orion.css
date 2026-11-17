@@ -236,6 +236,8 @@ details > summary:hover { color: var(--text); }
 /* ---------------------------------------------------------------- loader */
 .loader { animation: orion-fade-in .35s ease-out; }
 
+.loader-count { margin-left: auto; color: var(--text-dim); font-size: .78rem; white-space: nowrap; }
+
 /* The status fragment is re-fetched every couple of seconds while a machine is
    being built. Both animations below replay on every swap, which is what made
    the panel look as though it were reloading itself - the fade-out to 35% and

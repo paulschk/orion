@@ -6,7 +6,6 @@
 </div>
 
 {% if instance['status'] == 'provisioning' %}
-  {% set pct = job['progress'] if job and job['progress'] else 2 %}
   {# Only the tail: the whole log is metres long and the point here is that it
      moves. The box follows its own end unless the reader has scrolled up. #}
   {% set log_tail = (job['log'] or '').splitlines()[-9:] if job else [] %}
@@ -16,9 +15,14 @@
       <span class="loader-step">
         {% if job and job['step'] %}{{ job['step'] }}{% else %}Démarrage du provisionnement…{% endif %}
       </span>
-      <span class="loader-pct mono">{{ pct }}%</span>
+      {# The spinner says it is working; a percentage invented a precision the
+         phases do not have. The count is what is real: how many of the known
+         phases have been reached. #}
+      {% if steps %}
+      <span class="loader-count mono" data-step="{{ steps|length }}"
+            data-pattern="Étape {n} sur {{ step_total }}">Étape {{ steps|length }} sur {{ step_total }}</span>
+      {% endif %}
     </div>
-    <div class="bar"><span style="width:{{ pct }}%" data-target="{{ pct }}"></span></div>
 
     {% if log_tail %}
     <div class="loader-log" role="log">{{ log_tail|join('\n') }}</div>

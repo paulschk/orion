@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import __version__
 from .config import settings
+from .provision import STEP_TOTAL
 from .util import human_bytes, human_mb, money, pretty_date, pretty_datetime, slugify
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,6 +34,8 @@ templates.env.globals.update(
     base_url=settings.base_url,
     currency=settings.currency,
     billing_mode=settings.billing_mode,
+    # "step N of M" in the provisioning loader.
+    step_total=STEP_TOTAL,
 )
 
 
