@@ -19,8 +19,8 @@
     <div class="card-h"><h2>État</h2><span class="sub mono">{{ instance['slug'] }}.{{ domain }}</span></div>
     <div id="instance-status"
          hx-get="/api/instances/{{ instance['id'] }}/partial"
-         hx-trigger="{{ 'every 4s' if instance['status'] == 'provisioning' else 'every 20s' }}"
-         hx-swap="innerHTML">
+         hx-trigger="{{ 'every 2s' if instance['status'] == 'provisioning' else 'every 20s' }}"
+         hx-swap="innerHTML transition:false">
       {% include "partials/instance_status.html" %}
     </div>
 

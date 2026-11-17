@@ -15,7 +15,8 @@ from ..deps import client_ip, fint, fstr, guard_csrf, require_user
 from ..hostinfo import detect, fits, headroom
 from ..incus import IncusError, incus
 from ..templating import render
-from ..util import days_from_now, now, rand_password, slugify, snapshot_label
+from ..util import (days_from_now, friendly_name, now, rand_password, slugify,
+                     snapshot_label)
 
 router = APIRouter(prefix="/app")
 
@@ -282,7 +283,12 @@ async def instance_create(request: Request):
     elif use_saved_key and session["ssh_public_key"]:
         ssh_key = session["ssh_public_key"]
 
-    slug = unique_slug(name or f"{plan['slug']}-server")
+    # A counter in the name ("wordpress-2", "server-3") tells every visitor how
+    # many other instances exist and roughly when this one was made. A readable
+    # random pair gives nothing away; a client who wants their own name still
+    # gets it, and it is what appears in the panel either way.
+    friendly = name or friendly_name()
+    slug = unique_slug(friendly)
     # Each machine gets its own SSH account and its own identifier: a client is
     # never "orion" on every box, and support can refer to one machine by name.
     taken = {r["ssh_user"] for r in db.query("SELECT ssh_user FROM instances")}

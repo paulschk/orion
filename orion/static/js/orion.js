@@ -150,6 +150,45 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
   close();
 })();
 
+// The provisioning loader is replaced every couple of seconds. Two things have
+// to survive that. The bar must never go backwards: a step that happens to
+// report a smaller number reads as the installation starting over, and the
+// previous value is only in the DOM that htmx has just thrown away, so it is
+// kept here keyed by instance. And the log must stay pinned to its end, unless
+// the reader has scrolled up to look at something.
+// Both flags have to live outside the DOM: the box is replaced on every poll,
+// so anything written onto the element is gone exactly when it is needed. The
+// follow flag especially - a reader who has scrolled up to read something must
+// not be yanked back to the end two seconds later.
+const progressSeen = new Map();
+const logFollowing = new Map();
+
+function holdProgress() {
+  const box = document.getElementById('instance-progress');
+  if (!box) return;
+  const key = box.dataset.instanceId || '';
+  const fill = box.querySelector('.bar > span[data-target]');
+  if (fill) {
+    const wanted = Math.max(parseInt(fill.dataset.target, 10) || 0, progressSeen.get(key) || 0);
+    progressSeen.set(key, wanted);
+    fill.style.width = wanted + '%';
+    const pct = box.querySelector('.loader-pct');
+    if (pct) pct.textContent = wanted + '%';
+  }
+  const log = box.querySelector('.loader-log');
+  if (log && logFollowing.get(key) !== false) log.scrollTop = log.scrollHeight;
+}
+
+document.body.addEventListener('htmx:afterSwap', holdProgress);
+document.addEventListener('scroll', function (event) {
+  const log = event.target.closest && event.target.closest('.loader-log');
+  if (!log) return;
+  const box = log.closest('#instance-progress');
+  const key = box ? box.dataset.instanceId || '' : '';
+  const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  logFollowing.set(key, atEnd);
+}, true);
+
 // Reveal a stored credential once.
 document.addEventListener('click', function (event) {
   const btn = event.target.closest('[data-reveal]');

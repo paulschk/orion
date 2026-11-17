@@ -7,7 +7,10 @@
 
 {% if instance['status'] == 'provisioning' %}
   {% set pct = job['progress'] if job and job['progress'] else 2 %}
-  <div class="loader mt2">
+  {# Only the tail: the whole log is metres long and the point here is that it
+     moves. The box follows its own end unless the reader has scrolled up. #}
+  {% set log_tail = (job['log'] or '').splitlines()[-9:] if job else [] %}
+  <div class="loader mt2" id="instance-progress" data-instance-id="{{ instance['id'] }}">
     <div class="loader-head">
       <span class="spinner" aria-hidden="true"></span>
       <span class="loader-step">
@@ -17,14 +20,8 @@
     </div>
     <div class="bar"><span style="width:{{ pct }}%" data-target="{{ pct }}"></span></div>
 
-    {% if steps %}
-    <ul class="steps">
-      {% for step in steps[-5:] %}
-      <li class="{{ 'current' if loop.last else 'done' }}">
-        <span class="tick">{{ '•' if loop.last else '✓' }}</span>{{ step }}
-      </li>
-      {% endfor %}
-    </ul>
+    {% if log_tail %}
+    <div class="loader-log" role="log">{{ log_tail|join('\n') }}</div>
     {% endif %}
 
     <p class="tiny dim mt2">

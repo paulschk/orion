@@ -1,6 +1,12 @@
 {# The instance's own addresses. Swapped in place by every action that changes
    one, so renaming an address does not reload the page - which would take the
-   terminal session down with it. #}
+   terminal session down with it.
+
+   An address is written as an address: the label the client chose, in the
+   accent colour, then the shared domain dimmed behind it, so the eye lands on
+   the part that is theirs. The rename form used to sit open in the cell - an
+   input, a suffix and a button per row - which left the table looking like a
+   form rather than a list of addresses. It is now behind a disclosure. #}
 <div class="spread">
   <div class="small" style="font-weight:600">Les adresses de cette instance</div>
   <span class="tiny dim">une ligne par service publié</span>
@@ -14,32 +20,41 @@
     <tbody>
       {% for s in site_rows %}
       <tr>
-        <td class="mono small">
-          {% if s['domain'].endswith('.' + tenant_domain) %}
-          {% set suffix_len = tenant_domain|length + 1 %}
-          {# Edited in place rather than deleted and recreated, which would take
-             the address offline for as long as Caddy takes to reload. #}
-          <form method="post"
-                action="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
-                class="row tight"
-                hx-post="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
-                hx-target="#instance-addresses" hx-swap="innerHTML">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input class="input input-sm mono" name="label" aria-label="Nom de l'adresse"
-                   value="{{ s['domain'][:-suffix_len] }}" style="width:11rem"
-                   spellcheck="false" autocapitalize="off">
-            <span class="dim">.{{ tenant_domain }}</span>
-            <button class="btn btn-sm btn-ghost" title="Renommer cette adresse">Renommer</button>
-          </form>
-          {% else %}
-          <a href="https://{{ s['domain'] }}" target="_blank" rel="noopener">{{ s['domain'] }}</a>
-          {% endif %}
+        <td>
+          <div class="addr">
+            {% if s['domain'].endswith('.' + tenant_domain) %}
+            {% set suffix_len = tenant_domain|length + 1 %}
+            {% set label = s['domain'][:-suffix_len] %}
+            <a class="addr-host mono small" href="https://{{ s['domain'] }}" target="_blank"
+               rel="noopener"><span class="addr-label">{{ label }}</span><span class="addr-zone">.{{ tenant_domain }}</span></a>
+            {# Edited in place rather than deleted and recreated, which would take
+               the address offline for as long as Caddy takes to reload. #}
+            <details class="inline-edit">
+              <summary title="Renommer cette adresse">Renommer</summary>
+              <form method="post"
+                    action="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+                    class="row tight"
+                    hx-post="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+                    hx-target="#instance-addresses" hx-swap="innerHTML">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input class="input input-sm mono" name="label" aria-label="Nom de l'adresse"
+                       value="{{ label }}" style="width:9rem"
+                       spellcheck="false" autocapitalize="off">
+                <span class="dim mono tiny">.{{ tenant_domain }}</span>
+                <button class="btn btn-sm btn-ghost">Renommer</button>
+              </form>
+            </details>
+            {% else %}
+            <a class="addr-host mono small" href="https://{{ s['domain'] }}" target="_blank"
+               rel="noopener">{{ s['domain'] }}</a>
+            {% endif %}
+          </div>
         </td>
         <td class="mono small">:{{ s['upstream'] }}</td>
         <td class="small">
           {% if default_site and s['id'] == default_site['id'] %}
             <span class="badge idle">principale</span>
-          {% else %}<span class="dim">—</span>{% endif %}
+          {% else %}<span class="dim">&mdash;</span>{% endif %}
         </td>
         <td class="num">
           <span class="row tight" style="justify-content:flex-end">
@@ -68,5 +83,5 @@
   </table>
 </div>
 {% else %}
-<p class="small dim mt2">Aucune adresse pour l'instant.</p>
+<p class="small dim mt2">Aucune adresse pour l'instant. Publiez un service pour en créer une.</p>
 {% endif %}

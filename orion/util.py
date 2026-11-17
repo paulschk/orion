@@ -70,6 +70,38 @@ def snapshot_label(slug: str, requested: str = "", stamp: str = "",
     return f"{prefix}-{tail}"[:limit]
 
 
+# Two lists, and only adjectives whose masculine form already ends in -e: those
+# are invariable in French, so "loutre-calme" and "renard-calme" are both
+# correct and nobody has to think about agreement. Everything here is ASCII, so
+# nothing is mangled on the way through slugify() into a hostname.
+_FRIENDLY_ADJECTIVES = (
+    "agile", "aimable", "brave", "calme", "capable", "digne", "durable", "ferme",
+    "fiable", "humble", "large", "libre", "mince", "modeste", "notable", "paisible",
+    "propre", "rare", "riche", "robuste", "sage", "simple", "sobre", "solide",
+    "souple", "stable", "tendre", "tranquille", "utile", "vaste", "vivace",
+)
+_FRIENDLY_NOUNS = (
+    "abricot", "amande", "ancre", "aurore", "bison", "bouleau", "boussole", "brume",
+    "cacao", "cedre", "chalet", "citron", "colibri", "comete", "corail", "cygne",
+    "dauphin", "erable", "etoile", "falaise", "galet", "goeland", "hibou", "jade",
+    "jardin", "lagune", "lande", "lotus", "loutre", "mangue", "meandre", "menthe",
+    "nuage", "ocean", "olivier", "opale", "palmier", "papillon", "phare", "plume",
+    "quartz", "renard", "rivage", "sapin", "sentier", "talus", "thym", "vague",
+    "verger", "voilier",
+)
+
+
+def friendly_name() -> str:
+    """A name like a container gets from Docker: calm-otter, never server-3.
+
+    The address a client ends up with is built from this, so a counter in the
+    name would tell every visitor how many other instances exist and roughly
+    when this one was created. Two words say nothing and are far easier to read
+    back over the phone than a random string.
+    """
+    return f"{secrets.choice(_FRIENDLY_ADJECTIVES)}-{secrets.choice(_FRIENDLY_NOUNS)}"
+
+
 def rand_token(nbytes: int = 32) -> str:
     return secrets.token_urlsafe(nbytes)
 

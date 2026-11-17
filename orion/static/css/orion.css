@@ -235,6 +235,53 @@ details > summary:hover { color: var(--text); }
 
 /* ---------------------------------------------------------------- loader */
 .loader { animation: orion-fade-in .35s ease-out; }
+
+/* The status fragment is re-fetched every couple of seconds while a machine is
+   being built. Both animations below replay on every swap, which is what made
+   the panel look as though it were reloading itself - the fade-out to 35% and
+   the fade-in are only wanted on the first paint. */
+#instance-status .loader,
+#instance-status .htmx-added,
+#instance-status .htmx-added * { animation: none; }
+
+/* The provisioning log, scrolling at its own end. Fixed height so the card does
+   not grow a line at a time, and a thin bar because this one is content the
+   reader may genuinely want to look back through. */
+.loader-log {
+  margin-top: 12px;
+  height: 8.5rem;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: 11.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.loader-log::-webkit-scrollbar { width: 8px; }
+.loader-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* -------------------------------------------------------------- addresses */
+.addr { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.addr-host { text-decoration: none; white-space: nowrap; }
+.addr-label { color: var(--accent); font-weight: 600; }
+.addr-zone { color: var(--text-dim); }
+.addr-host:hover .addr-label { text-decoration: underline; }
+.inline-edit > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-dim);
+  font-size: .72rem;
+  user-select: none;
+}
+.inline-edit > summary::-webkit-details-marker { display: none; }
+.inline-edit > summary::before { content: "\2732"; margin-right: 5px; }
+.inline-edit > summary:hover { color: var(--accent); }
+.inline-edit form { margin-top: 6px; }
 .loader-head { display: flex; align-items: center; gap: 9px; font-size: .9rem; font-weight: 600; }
 .loader-head .loader-step { flex: 1 1 auto; color: var(--text); }
 .loader-head .loader-pct { color: var(--accent); font-size: .82rem; }
@@ -438,7 +485,18 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 
 /* No scrollbar at all, on purpose: the wheel scrolls the buffer directly, and a
    bar in a terminal pane is a strip of chrome that costs a column of text. The
-   "last lines" marker is what tells you the view is above the end. */
+   "last lines" marker is what tells you the view is above the end.
+
+   Both layers need it. xterm 5.5 makes `.xterm` itself scrollable (its content
+   is taller than the pane by a few pixels), so a 17px native bar appeared on the
+   *outer* element while `.xterm-viewport` - the one that actually holds the
+   scrollback - was already clean. */
+.term-pane .xterm {
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.term-pane .xterm::-webkit-scrollbar { width: 0; height: 0; }
 .term-pane .xterm-viewport {
   scrollbar-width: none;
   -ms-overflow-style: none;
