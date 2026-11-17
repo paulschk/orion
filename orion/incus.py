@@ -135,8 +135,15 @@ class Incus:
         return self.query(f"/1.0/instances/{name}") or {}
 
     def primary_ip(self, name: str) -> str:
-        data = self.config(name)
-        for net_name, net in (data.get("state") or {}).get("network", {}).items():
+        """First global IPv4 address of a running instance.
+
+        The plain instance record carries no runtime state at all - network
+        information only exists on the /state endpoint. Reading it from
+        `config()` silently returns nothing, which looks exactly like a
+        container that failed to get an address.
+        """
+        state = self.query(f"/1.0/instances/{name}/state") or {}
+        for net_name, net in (state.get("network") or {}).items():
             if net_name == "lo":
                 continue
             for addr in net.get("addresses", []):
