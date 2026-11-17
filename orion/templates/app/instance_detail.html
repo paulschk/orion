@@ -145,8 +145,14 @@
       </details>
     {% else %}
       <p class="small muted mt2">
-        Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
-        Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
+        {% if site_rows %}
+          Cette instance route déjà {{ site_rows|length }} adresse{{ 's' if site_rows|length > 1 }} —
+          la liste est en mode avancé ci-dessous. Vous pouvez aussi activer son adresse d'origine,
+          incluse dans toutes les offres.
+        {% else %}
+          Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
+          Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
+        {% endif %}
       </p>
       <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt2">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -216,10 +222,16 @@
             <td class="mono small">{{ s['domain'] }}</td>
             <td class="mono small">:{{ s['upstream'] }}</td>
             <td class="num">
-              <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="btn btn-sm btn-ghost">Retirer</button>
-              </form>
+              <span class="row tight" style="justify-content:flex-end">
+                <form method="post" action="/app/sites/{{ s['id'] }}/primary" class="inline-form">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn btn-sm btn-ghost" title="Afficher cette adresse en mode simple">Principale</button>
+                </form>
+                <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="btn btn-sm btn-ghost">Retirer</button>
+                </form>
+              </span>
             </td>
           </tr>
           {% endfor %}

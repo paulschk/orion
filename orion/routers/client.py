@@ -388,6 +388,26 @@ async def snapshot_delete(request: Request, instance_id: int, snapshot: str):
     return RedirectResponse(f"/app/instances/{instance_id}?ok=Sauvegarde+supprim%C3%A9e", status_code=303)
 
 
+@router.post("/sites/{site_id}/primary")
+async def site_make_primary(request: Request, site_id: int):
+    """Promote an address to the instance's main one, so it shows in Simple mode."""
+    session = require_user(request)
+    form = await request.form()
+    guard_csrf(request, session, form)
+    site = db.one("SELECT s.*, i.user_id, i.slug FROM sites s "
+                  "JOIN instances i ON i.id = s.instance_id WHERE s.id = ?", (site_id,))
+    if site is None or (session["role"] != "admin" and site["user_id"] != session["uid"]):
+        return RedirectResponse("/app/instances?err=Adresse+introuvable", status_code=303)
+
+    db.execute("UPDATE sites SET is_primary = 0 WHERE instance_id = ?", (site["instance_id"],))
+    db.execute("UPDATE sites SET is_primary = 1 WHERE id = ?", (site_id,))
+    activity.log("site.primary", user_id=session["uid"], target=site["domain"],
+                 detail=site["slug"])
+    message = f"{site['domain']} est désormais l'adresse principale de {site['slug']}."
+    return RedirectResponse(
+        f"/app/instances/{site['instance_id']}?ok={quote(message)}", status_code=303)
+
+
 @router.post("/instances/{instance_id}/subdomain")
 async def subdomain_set(request: Request, instance_id: int):
     """Simple mode: change only the label of the instance's own subdomain."""
