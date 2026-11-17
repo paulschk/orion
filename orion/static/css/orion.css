@@ -110,8 +110,11 @@ html { scroll-behavior: smooth; }
 .logo { font-weight: 700; font-size: 1.08rem; color: var(--text); letter-spacing: -0.02em; }
 .logo .num { color: var(--accent); }
 .pnav nav { display: flex; gap: 24px; align-items: center; }
-.pnav nav a { color: var(--text-muted); font-size: 0.92rem; font-weight: 500; text-decoration: none; }
-.pnav nav a:hover, .pnav nav a.active { color: var(--text); }
+/* Links only. `.pnav nav a` outweighs `.btn-primary` on specificity, so without
+   the :not(.btn) the header's call to action inherited the nav's grey and its
+   font weight - a grey label on a blue button. */
+.pnav nav a:not(.btn) { color: var(--text-muted); font-size: 0.92rem; font-weight: 500; text-decoration: none; }
+.pnav nav a:not(.btn):hover, .pnav nav a:not(.btn).active { color: var(--text); }
 
 /* ---------------------------------------------------------------- burger */
 /* One control for both shells: three bars that fold into a cross when open.
@@ -149,11 +152,13 @@ html { scroll-behavior: smooth; }
                 padding .3s ease, visibility .3s;
   }
   .pnav nav.open { max-height: 78vh; opacity: 1; visibility: visible; padding: 8px 20px 18px; }
-  .pnav nav a {
+  .pnav nav a:not(.btn) {
     padding: 14px 2px; font-size: 1rem; border-bottom: 1px solid var(--border-soft);
   }
-  .pnav nav a:last-child { border-bottom: 0; }
-  .pnav nav a.btn { margin-top: 12px; text-align: center; }
+  .pnav nav a:not(.btn):last-child { border-bottom: 0; }
+  /* A comfortable target at the end of the panel, not a squashed one: the
+     link padding above used to apply to it as well. */
+  .pnav nav a.btn { margin-top: 14px; width: 100%; padding: 12px 16px; }
 }
 
 .hero { padding: 84px 0 64px; border-bottom: 1px solid var(--border); }
