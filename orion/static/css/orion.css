@@ -421,6 +421,7 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   color: var(--text); overflow-x: auto; white-space: pre-wrap; word-break: break-all;
 }
 .term-pane {
+  position: relative;
   height: 460px;
   background: #05070d;
   border: 1px solid var(--border);
@@ -430,6 +431,31 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 }
 .term-pane .xterm { height: 100%; }
 .term-pane .xterm-viewport { background: transparent !important; }
+
+/* xterm draws its own scrollbar and leaves it to the platform, so on a desktop
+   it is an overlay that appears while scrolling and vanishes after - the
+   terminal looks like it scrolls only sometimes. Same thin themed bar as the
+   rest of the panel instead. */
+.term-pane .xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.term-pane .xterm-viewport::-webkit-scrollbar { width: 9px; }
+.term-pane .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.term-pane .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 999px;
+}
+.term-pane .xterm-viewport::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Shown only while the view is above the end of the output. */
+.term-jump {
+  position: absolute; right: 14px; bottom: 12px; z-index: 3;
+  font: inherit; font-size: .72rem; line-height: 1.4;
+  padding: 4px 10px; cursor: pointer;
+  color: var(--accent); background: rgba(11, 12, 16, .94);
+  border: 1px solid var(--border); border-radius: 999px;
+}
+.term-jump:hover { border-color: var(--accent); }
 #terminal-status.ok { color: var(--ok); }
 #terminal-status.bad { color: var(--bad); }
 

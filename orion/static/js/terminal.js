@@ -23,7 +23,17 @@
     cursorBlink: true,
     fontSize: 13,
     fontFamily: css.getPropertyValue('--mono').trim() || 'monospace',
-    scrollback: 5000,
+    scrollback: 10000,
+    // Wheel behaviour, made deliberate rather than incidental:
+    // - animated by a fixed duration, so a notch always moves the same amount
+    //   instead of depending on the device;
+    // - typing returns the view to the prompt, which is what a shell user
+    //   expects after scrolling back through history;
+    // - Alt jumps further for long output.
+    smoothScrollDuration: 90,
+    scrollOnUserInput: true,
+    fastScrollModifier: 'alt',
+    fastScrollSensitivity: 5,
     theme: {
       background: '#05070d',
       foreground: '#e0e0e0',
@@ -37,6 +47,8 @@
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
   term.open(pane);
+  // Reachable from the console: measuring scroll behaviour needs the instance.
+  window.orionTerm = term;
 
   const state = pane.dataset.state || '';
   if (state !== 'running') {
@@ -117,7 +129,7 @@
         } catch (e) { /* not a control frame */ }
         return;
       }
-      term.write(new Uint8Array(event.data));
+      term.write(new Uint8Array(event.data), refreshJump);
     };
 
     ws.onerror = function () {
@@ -141,6 +153,48 @@
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
   }
+
+  // A scrollbar nobody styled is the same scrollbar nobody can find: it comes
+  // and goes with the platform's overlay behaviour, so the terminal seems to
+  // scroll only sometimes. It is styled in the stylesheet; this keeps the
+  // marker honest about where in the buffer the view actually sits.
+  const jump = document.createElement('button');
+  jump.type = 'button';
+  jump.className = 'term-jump';
+  jump.textContent = '\u2193 Dernières lignes';
+  jump.hidden = true;
+  jump.addEventListener('click', function () {
+    term.scrollToBottom();
+    term.focus();
+  });
+  pane.appendChild(jump);
+
+  function refreshJump() {
+    const buf = term.buffer.active;
+    jump.hidden = buf.viewportY >= buf.baseY;
+  }
+  if (term.onScroll) term.onScroll(refreshJump);
+  // The viewport is a real scroller, so its own event is the one that cannot be
+  // missed. xterm's onScroll does not fire on every path that moves the view -
+  // notably not for a wheel the custom handler above has consumed, which is
+  // precisely when the marker matters.
+  const viewport = pane.querySelector('.xterm-viewport');
+  if (viewport) viewport.addEventListener('scroll', refreshJump, { passive: true });
+  window.addEventListener('resize', refreshJump);
+
+  // The wheel belongs to the terminal while there is history to move through,
+  // and is handed back to the page once the view reaches either end. Without
+  // this the page behind scrolls whenever the buffer is at an end - which is
+  // exactly the "it scrolls the wrong thing" behaviour.
+  term.attachCustomWheelEventHandler(function (event) {
+    if (!event.deltaY) return true;
+    const buf = term.buffer.active;
+    const scrollingUp = event.deltaY < 0;
+    if (scrollingUp ? buf.viewportY <= 0 : buf.viewportY >= buf.baseY) {
+      return false;                       // nothing left here: let the page have it
+    }
+    return true;                          // xterm consumes it and preventDefaults
+  });
 
   term.onData(function (data) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(encoder.encode(data));
