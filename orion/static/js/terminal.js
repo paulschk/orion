@@ -2,6 +2,10 @@
  *
  * Wire format is raw bytes in both directions; control messages are JSON text
  * frames. Bytes in, bytes out, so nothing has to survive a UTF-8 round trip.
+ *
+ * A terminal is the most latency-sensitive thing the panel serves: every
+ * keystroke is a round trip, and a single dropped frame is immediately visible.
+ * So this reconnects on its own, and keeps the connection warm in between.
  */
 (function () {
   const pane = document.getElementById('terminal');
@@ -43,28 +47,64 @@
     return;
   }
 
-  let ws = null;
-  let finished = false;
-  const encoder = new TextEncoder();
-
-  const CLOSE_REASONS = {
+  // Codes the server closes with on purpose. Reconnecting cannot help, so they
+  // are reported and the terminal is left alone.
+  const DEFINITIVE = {
     4401: 'session expirée, rechargez la page',
     4403: 'origine refusée',
     4404: 'accès refusé',
     4409: 'instance non démarrée',
-    4429: 'trop de sessions ouvertes',
-    1011: 'erreur interne'
+    4429: 'trop de sessions ouvertes'
   };
+  const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+  const KEEPALIVE_MS = 25000;
+
+  let ws = null;
+  let attempt = 0;
+  let retryTimer = null;
+  let keepaliveTimer = null;
+  let stopped = false;
+  const encoder = new TextEncoder();
+
+  function stopKeepalive() {
+    if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null; }
+  }
+
+  function reconnect(reason) {
+    if (stopped || retryTimer) return;
+    const wait = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
+    attempt += 1;
+    setStatus('reconnexion dans ' + Math.round(wait / 1000) + ' s…', 'warn');
+    term.writeln('\r\n\x1b[33m[connexion perdue' + (reason ? ' — ' + reason : '') +
+                 '] nouvelle tentative dans ' + Math.round(wait / 1000) + ' s.\x1b[0m');
+    retryTimer = setTimeout(function () { retryTimer = null; connect(); }, wait);
+  }
 
   function connect() {
-    setStatus('connexion…');
+    if (stopped) return;
+    setStatus(attempt ? 'reconnexion…' : 'connexion…');
     ws = new WebSocket(pane.dataset.ws);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = function () {
+      const wasRetry = attempt > 0;
+      attempt = 0;
       setStatus('connecté', 'ok');
       sendResize();
       term.focus();
+      // The old shell died with the old socket; say so rather than pretending
+      // the session survived.
+      if (wasRetry) {
+        term.writeln('\x1b[90m[session rétablie — un nouveau shell a été ouvert]\x1b[0m');
+      }
+      stopKeepalive();
+      // A relay or a NAT can drop a connection that has been silent. A control
+      // frame the server ignores costs nothing and keeps it warm.
+      keepaliveTimer = setInterval(function () {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, KEEPALIVE_MS);
     };
 
     ws.onmessage = function (event) {
@@ -81,17 +121,19 @@
     };
 
     ws.onerror = function () {
-      if (!finished) setStatus('erreur de connexion', 'bad');
+      /* onclose always follows; act there so there is one path. */
     };
 
     ws.onclose = function (event) {
-      if (finished) return;
-      finished = true;
-      const why = CLOSE_REASONS[event.code];
-      setStatus(why || 'session terminée', 'dim');
-      term.writeln('\r\n\x1b[90m[session terminée' + (why ? ' — ' + why : '') +
-                   ']\x1b[0m');
-      term.writeln('\x1b[90mRechargez la page pour en ouvrir une nouvelle.\x1b[0m');
+      stopKeepalive();
+      const why = DEFINITIVE[event.code];
+      if (why) {
+        stopped = true;
+        setStatus(why, 'dim');
+        term.writeln('\r\n\x1b[90m[session terminée — ' + why + ']\x1b[0m');
+        return;
+      }
+      reconnect(event.code === 1006 ? 'liaison interrompue' : 'code ' + event.code);
     };
   }
 
@@ -113,6 +155,16 @@
     }).observe(pane);
   }
   window.addEventListener('resize', function () { fit.fit(); });
+
+  // Browsers throttle timers in a hidden tab, so a backgrounded session often
+  // comes back dropped. Reconnect the moment the tab is looked at again.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible' || stopped) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    attempt = 0;
+    connect();
+  });
 
   fit.fit();
   connect();

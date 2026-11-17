@@ -38,4 +38,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"
 
-CMD ["uvicorn", "orion.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# The websocket ping is deliberately patient. The defaults (ping every 20 s,
+# give up 20 s later) close a terminal session the moment a relayed or mobile
+# link stalls for half a minute, which is exactly when a client does not want
+# to lose their shell.
+CMD ["uvicorn", "orion.app:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*", \
+     "--ws-ping-interval", "30", "--ws-ping-timeout", "90"]

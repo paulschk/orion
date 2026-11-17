@@ -124,6 +124,10 @@ async def console(websocket: WebSocket, instance_id: int):
                 if control.get("type") == "resize":
                     console_session.resize(
                         int(control.get("cols") or 80), int(control.get("rows") or 24))
+                # "ping" is the client's keepalive: a relay or a NAT will drop a
+                # connection that has been silent, and the generic WebSocket API
+                # gives the browser no way to send a protocol-level ping. There
+                # is nothing to answer - receiving it is the whole point.
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
