@@ -340,34 +340,46 @@ sudo -u www-data /usr/local/bin/wp core install   --url="https://@@HOSTNAME@@@@D
 sudo -u www-data /usr/local/bin/wp rewrite structure '/%postname%/' --hard
 sudo -u www-data /usr/local/bin/wp option update blogdescription "Hébergé par @@BRAND@@"
 
-step "Replacing the theme's demo landing page"
-# A fresh WordPress greets its owner with the theme's own front page and a demo
-# post. What a client should find instead is the same welcome the other
-# templates serve - as a static front page, so it stays editable like any page.
-cat > /tmp/orion-welcome.html <<'ORION_WP_WELCOME'
-<!-- wp:html -->
-<div style="max-width:34rem;margin:2rem auto;padding:2rem;background:#0b0c10;color:#e0e0e0;border-radius:12px;font-family:system-ui,sans-serif;line-height:1.6">
-<h1 style="margin:0 0 .5rem;font-size:1.6rem;color:#e0e0e0">@@BRAND@@<span style="color:#3b82f6">Hosting</span></h1>
-<p style="color:#9ca3af">Votre site WordPress est en ligne. Rendez-vous dans
-<code style="background:#111827;border:1px solid #1f2937;padding:.15rem .4rem;border-radius:4px">/wp-admin/</code>
-pour le composer.</p>
-<p style="color:#9ca3af">Panneau d'hébergement :
-<a style="color:#3b82f6" href="@@BASE_URL@@">@@BASE_URL@@</a></p>
-</div>
-<!-- /wp:html -->
-ORION_WP_WELCOME
-chown www-data:www-data /tmp/orion-welcome.html
-FRONT_ID=$(sudo -u www-data /usr/local/bin/wp post create /tmp/orion-welcome.html \
-             --post_type=page --post_title="Bienvenue" --post_status=publish --porcelain 2>/dev/null || true)
-if [ -n "${FRONT_ID:-}" ]; then
-  sudo -u www-data /usr/local/bin/wp option update show_on_front page >/dev/null
-  sudo -u www-data /usr/local/bin/wp option update page_on_front "${FRONT_ID}" >/dev/null
-  # Otherwise the theme prints the page title above the block. Harmless where
-  # the template slug does not exist - WordPress falls back to the default.
-  sudo -u www-data /usr/local/bin/wp post meta update "${FRONT_ID}" \
-    _wp_page_template page-no-title >/dev/null 2>&1 || true
-fi
-rm -f /tmp/orion-welcome.html
+step "Installing the welcome theme"
+# The welcome lives in a theme of its own rather than in a front page the client
+# would have to find and delete. While this theme is active, the site *is* the
+# welcome; activating any other theme removes it completely, with nothing left
+# behind in the content. It is a placeholder to be replaced, not a theme to
+# build a site with.
+THEME=/var/www/@@HOSTNAME@@/wp-content/themes/orion-welcome
+install -d -o www-data -g www-data "$THEME"
+cat > "$THEME/style.css" <<'ORION_THEME_CSS'
+/*
+Theme Name: @@BRAND@@ Welcome
+Theme URI: @@BASE_URL@@
+Description: Page d'accueil d'installation, a remplacer par un vrai theme. Tant qu'il est actif le site affiche cette page ; activer un autre theme la fait disparaitre entierement.
+Version: 1.0
+Author: @@BRAND@@
+*/
+ORION_THEME_CSS
+cat > "$THEME/index.php" <<'ORION_THEME_INDEX'
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?php bloginfo('name'); ?> - <?php bloginfo('description'); ?></title>
+<style>
+ body{margin:0;background:#0b0c10;color:#e0e0e0;font:16px/1.6 system-ui,sans-serif;
+      display:flex;min-height:100vh;align-items:center;justify-content:center}
+ .c{max-width:34rem;padding:2rem}
+ h1{margin:0 0 .5rem;font-size:1.6rem}
+ .n{color:#3b82f6}
+ p{color:#9ca3af}
+ code{background:#111827;border:1px solid #1f2937;padding:.15rem .4rem;border-radius:4px}
+ a{color:#3b82f6}
+</style></head><body><div class="c">
+<h1>@@BRAND@@<span class="n">Hosting</span></h1>
+<p>Votre site WordPress est en ligne. Rendez-vous dans <code>/wp-admin/</code> pour le
+composer, puis activez le theme de votre choix : cette page disparaitra d'elle-meme.</p>
+<p>Panneau d'hebergement : <a href="@@BASE_URL@@">@@BASE_URL@@</a></p>
+</div></body></html>
+ORION_THEME_INDEX
+chown -R www-data:www-data "$THEME"
+sudo -u www-data /usr/local/bin/wp theme activate orion-welcome
 
 # The demo post, the sample page and the draft privacy policy are WordPress's
 # own shop window, not the client's content. Immediately after an install they

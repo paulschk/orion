@@ -1,0 +1,4 @@
+{# A message about something the client just did. It is rendered *inside* the
+   fragment that was swapped, so it appears next to the field or the row they
+   acted on - a notice above the fold is a notice nobody reads. #}
+{% if notice %}<div class="alert {{ 'err' if notice_tone == 'err' else 'ok' }}">{{ notice }}</div>{% endif %}

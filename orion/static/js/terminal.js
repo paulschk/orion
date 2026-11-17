@@ -52,7 +52,7 @@
 
   const state = pane.dataset.state || '';
   if (state !== 'running') {
-    fit.fit();
+    fitToWholeRows();
     term.writeln('\x1b[90mInstance ' + (state === 'stopped' ? 'arrêtée' : state) +
                  ' — démarrez-la pour ouvrir une session.\x1b[0m');
     setStatus('indisponible', 'dim');
@@ -196,6 +196,20 @@
     return true;                          // xterm consumes it and preventDefaults
   });
 
+  // A terminal is made of whole rows, so a pane of an arbitrary height always
+  // leaves a strip of empty background under the last line. Ask the fit addon
+  // what it would use, apply it, then set the pane to exactly that height.
+  const PADDING = 16;                       // 8px top and bottom, from the sheet
+  function fitToWholeRows() {
+    const proposal = fit.proposeDimensions && fit.proposeDimensions();
+    if (!proposal || !proposal.rows) { fit.fit(); return; }
+    term.resize(proposal.cols, proposal.rows);
+    const screen = pane.querySelector('.xterm-screen');
+    if (!screen) return;
+    const cell = screen.getBoundingClientRect().height / term.rows;
+    if (cell > 0) pane.style.height = Math.round(proposal.rows * cell + PADDING) + 'px';
+  }
+
   term.onData(function (data) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(encoder.encode(data));
   });
@@ -205,10 +219,10 @@
     let raf = null;
     new ResizeObserver(function () {
       if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(function () { fit.fit(); });
+      raf = requestAnimationFrame(fitToWholeRows);
     }).observe(pane);
   }
-  window.addEventListener('resize', function () { fit.fit(); });
+  window.addEventListener('resize', fitToWholeRows);
 
   // Browsers throttle timers in a hidden tab, so a backgrounded session often
   // comes back dropped. Reconnect the moment the tab is looked at again.
@@ -220,6 +234,6 @@
     connect();
   });
 
-  fit.fit();
+  fitToWholeRows();
   connect();
 })();

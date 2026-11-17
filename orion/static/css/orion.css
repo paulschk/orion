@@ -422,9 +422,11 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 }
 .term-pane {
   position: relative;
-  /* Sized against the window rather than a fixed 460px: a terminal is read in
-     screenfuls, and on a large display it was using a third of one. */
-  height: clamp(480px, 68vh, 900px);
+  /* A target height, not a promise: the script snaps it to a whole number of
+     rows after every fit, so no strip of empty pane is left under the last
+     line. Growing it with the window made that gap obvious, which is why it is
+     back to a fixed size. */
+  height: 460px;
   background: #05070d;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -434,20 +436,14 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 .term-pane .xterm { height: 100%; }
 .term-pane .xterm-viewport { background: transparent !important; }
 
-/* xterm draws its own scrollbar and leaves it to the platform, so on a desktop
-   it is an overlay that appears while scrolling and vanishes after - the
-   terminal looks like it scrolls only sometimes. Same thin themed bar as the
-   rest of the panel instead. */
+/* No scrollbar at all, on purpose: the wheel scrolls the buffer directly, and a
+   bar in a terminal pane is a strip of chrome that costs a column of text. The
+   "last lines" marker is what tells you the view is above the end. */
 .term-pane .xterm-viewport {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.term-pane .xterm-viewport::-webkit-scrollbar { width: 9px; }
-.term-pane .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
-.term-pane .xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--border); border-radius: 999px;
-}
-.term-pane .xterm-viewport::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+.term-pane .xterm-viewport::-webkit-scrollbar { width: 0; height: 0; }
 
 /* Shown only while the view is above the end of the output. */
 .term-jump {
@@ -459,9 +455,6 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 }
 .term-jump:hover { border-color: var(--accent); }
 
-@media (max-width: 900px) {
-  .term-pane { height: 54vh; min-height: 360px; }
-}
 #terminal-status.ok { color: var(--ok); }
 #terminal-status.bad { color: var(--bad); }
 

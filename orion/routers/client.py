@@ -570,13 +570,18 @@ def _oob(element_id: str, request: Request, template: str, session, **context) -
 
 def _fragment(request: Request, template: str | None, session, *, message: str = "",
               tone: str = "ok", extra: str = "", **context) -> HTMLResponse:
-    """A partial to swap in, with the message sent out of band."""
-    notice = render(request, "partials/flash.html", session=session,
-                    flash_ok=message if tone == "ok" else "",
-                    flash_err=message if tone == "err" else "").body.decode()
-    parts = [f'<div id="flash" hx-swap-oob="true">{notice}</div>']
+    """A partial to swap in, carrying its own message.
+
+    The message is rendered inside the fragment rather than into a slot at the
+    top of the page: acting on a field and being told why it was refused are the
+    same event, and the answer has to appear where the client is looking.
+    """
+    parts = []
     if extra:
         parts.append(extra)
+    if message:
+        parts.append(render(request, "partials/notice.html", session=session,
+                            notice=message, notice_tone=tone).body.decode())
     if template:
         parts.append(render(request, template, session=session, **context).body.decode())
     return HTMLResponse("".join(parts))
