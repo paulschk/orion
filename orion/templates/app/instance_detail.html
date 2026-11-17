@@ -181,7 +181,7 @@
     <span class="sub">{{ job['status'] if job else '—' }}</span>
   </div>
   {% if job and job['log'] %}
-    <div class="terminal">{{ job['log'] }}</div>
+    <div class="job-log">{{ job['log'] }}</div>
   {% else %}
     <p class="small dim">Aucun journal disponible.</p>
   {% endif %}

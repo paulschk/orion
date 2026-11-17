@@ -215,8 +215,9 @@
   // `fixed` deliberately does not read padding-bottom: that is the value this
   // function writes, so feeding it back is the loop that folds the pane.
   function fitToWholeRows() {
+    const xterm = pane.querySelector('.xterm');
     const screen = pane.querySelector('.xterm-screen');
-    if (!screen) return;
+    if (!xterm || !screen) return;
     const style = getComputedStyle(pane);
     const fixed = BASE_PAD + ['paddingTop', 'borderTopWidth', 'borderBottomWidth']
       .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
@@ -228,11 +229,24 @@
     const cols = (proposal && proposal.cols) || term.cols;
     const rows = Math.max(2, Math.floor((TARGET_HEIGHT - fixed) / cell));
 
-    const padBottom = Math.round(BASE_PAD + EXTRA_ROWS * cell);
-    if (pane.style.paddingBottom !== padBottom + 'px') pane.style.paddingBottom = padBottom + 'px';
-
     if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
-    const wanted = Math.round(rows * cell + fixed + EXTRA_ROWS * cell) + 'px';
+
+    // Measure what the screen really occupies instead of modelling it. The
+    // renderer offsets the screen a few pixels inside its container - 6px here -
+    // and a model that forgets that offset leaves the container one pixel short,
+    // which is still an overflow even if `overflow: hidden` makes it invisible.
+    // The offset is a property of the layout (it follows the width, not the
+    // height), so reading it here cannot feed back into the height written.
+    const xtermRect = xterm.getBoundingClientRect();
+    const screenRect = screen.getBoundingClientRect();
+    const xtermStyle = getComputedStyle(xterm);
+    const screenTop = screenRect.top - xtermRect.top
+      - (parseFloat(xtermStyle.borderTopWidth) || 0) - (parseFloat(xtermStyle.paddingTop) || 0);
+    const needed = screenTop + screenRect.height + EXTRA_ROWS * cell;
+
+    // Not rounded: a whole-pixel container around a fractional screen is exactly
+    // the remainder this is meant to remove.
+    const wanted = needed + fixed + 'px';
     if (pane.style.height !== wanted) pane.style.height = wanted;
   }
 

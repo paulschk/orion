@@ -82,7 +82,7 @@
 
 <div class="card">
   <div class="card-h"><h2>Journal de provisionnement</h2><span class="sub">{{ job['status'] if job else '—' }}</span></div>
-  {% if job and job['log'] %}<div class="terminal">{{ job['log'] }}</div>
+  {% if job and job['log'] %}<div class="job-log">{{ job['log'] }}</div>
   {% else %}<p class="small dim">Aucun journal.</p>{% endif %}
 </div>
 

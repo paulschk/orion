@@ -482,7 +482,18 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   padding: 8px 6px 8px 10px;
   overflow: hidden;
 }
-.term-pane .xterm { height: 100%; }
+/* The terminal fills the pane exactly: the pane already provides the frame, so
+   the container adds nothing of its own. Stated rather than inherited, because
+   `.xterm` also carries xterm's own `.terminal` class - a rule of ours aimed at
+   that name silently resizes the terminal (see .job-log above). */
+.term-pane .xterm {
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  max-height: none;
+  background: transparent;
+}
 .term-pane .xterm-viewport { background: transparent !important; }
 
 /* No scrollbar at all, on purpose: the wheel scrolls the buffer directly, and a
@@ -518,13 +529,19 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 #terminal-status.ok { color: var(--ok); }
 #terminal-status.bad { color: var(--bad); }
 
-.terminal {
+/* The provisioning log block. Its class used to be `.terminal` - which is
+   exactly the class xterm puts on its own root element, so this rule landed on
+   the terminal itself: a 420px max-height (the terminal's screen was 435px, and
+   41px of it overflowed), a 12/14 padding and border on top of the pane's own,
+   and a warm #d8c6ad text colour left over from the retired palette. The
+   terminal's font belongs to terminal.js; nothing here should reach it. */
+.job-log {
   background: #05070d; border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 12px 14px; font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
   max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word;
-  color: #d8c6ad;
+  color: var(--text-muted);
 }
-.terminal .err { color: var(--bad); }
+.job-log .err { color: var(--bad); }
 
 .alert {
   padding: 11px 15px; border-radius: var(--radius-sm); font-size: 0.9rem;
