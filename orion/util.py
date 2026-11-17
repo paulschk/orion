@@ -39,11 +39,35 @@ def pretty_datetime(iso: str | None) -> str:
     return dt.strftime("%d %b %Y %H:%M")
 
 
-def slugify(value: str, fallback: str = "server") -> str:
+def slugify(value: str, fallback: str = "server", limit: int = 32) -> str:
+    """A safe token: lowercase, dashes, never ending in one.
+
+    The strip happens *after* the truncation on purpose. Cutting a long name
+    first can leave a trailing dash, and Incus refuses a name that does not end
+    with a letter or a digit - a snapshot label built from a long slug and a
+    label was rejected with a raw daemon error for exactly that reason.
+    """
     value = (value or "").strip().lower()
     value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
     value = re.sub(r"-{2,}", "-", value)
-    return (value or fallback)[:32]
+    return (value or fallback)[:limit].strip("-") or fallback
+
+
+def snapshot_label(slug: str, requested: str = "", stamp: str = "",
+                   suffix: int = 0, limit: int = 63) -> str:
+    """A snapshot name: timestamp kept whole, human part shortened to fit.
+
+    A client reads this name, so the date and time are the parts that must not
+    be cut - and the result must still satisfy Incus, which wants it to end
+    alphanumerically and to stay within the length cap.
+    """
+    tail = f"{stamp}-{suffix}" if suffix else (stamp or "")
+    if not tail:
+        return slugify(f"{slug}-{requested}" if requested else slug, limit=limit)
+    room = max(1, limit - len(tail) - 1)
+    human = f"{slug}-{requested}" if requested else slug
+    prefix = slugify(human, limit=room)
+    return f"{prefix}-{tail}"[:limit]
 
 
 def rand_token(nbytes: int = 32) -> str:

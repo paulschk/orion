@@ -34,17 +34,23 @@
     <div class="row tight">
       {% if site %}
         {% if site['domain'] != default_domain %}
-        <form method="post" action="/app/sites/{{ site['id'] }}/primary" class="inline-form">
+        <form method="post" action="/app/sites/{{ site['id'] }}/primary" class="inline-form"
+              hx-post="/app/sites/{{ site['id'] }}/primary"
+              hx-target="#instance-services" hx-swap="innerHTML">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="btn btn-sm btn-ghost" title="Afficher cette adresse en mode simple">Principale</button>
         </form>
         {% endif %}
-        <form method="post" action="/app/sites/{{ site['id'] }}/delete" class="inline-form">
+        <form method="post" action="/app/sites/{{ site['id'] }}/delete" class="inline-form"
+              hx-post="/app/sites/{{ site['id'] }}/delete"
+              hx-target="#instance-services" hx-swap="innerHTML">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="btn btn-sm btn-ghost">Dépublier</button>
         </form>
       {% else %}
-        <form method="post" action="/app/instances/{{ instance['id'] }}/services/publish" class="inline-form">
+        <form method="post" action="/app/instances/{{ instance['id'] }}/services/publish" class="inline-form"
+              hx-post="/app/instances/{{ instance['id'] }}/services/publish"
+              hx-target="#instance-services" hx-swap="innerHTML">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="port" value="{{ s['port'] }}">
           <button class="btn btn-sm {{ '' if s['caution'] else 'btn-primary' }}">Rendre accessible</button>
@@ -82,7 +88,9 @@
       <div class="tiny dim">port {{ site['upstream'] }} · personne à l'écoute</div>
     </div>
     <div class="row tight">
-      <form method="post" action="/app/sites/{{ site['id'] }}/delete" class="inline-form">
+      <form method="post" action="/app/sites/{{ site['id'] }}/delete" class="inline-form"
+              hx-post="/app/sites/{{ site['id'] }}/delete"
+              hx-target="#instance-services" hx-swap="innerHTML">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="btn btn-sm btn-ghost">Retirer</button>
       </form>

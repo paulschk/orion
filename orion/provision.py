@@ -340,6 +340,47 @@ sudo -u www-data /usr/local/bin/wp core install   --url="https://@@HOSTNAME@@@@D
 sudo -u www-data /usr/local/bin/wp rewrite structure '/%postname%/' --hard
 sudo -u www-data /usr/local/bin/wp option update blogdescription "Hébergé par @@BRAND@@"
 
+step "Replacing the theme's demo landing page"
+# A fresh WordPress greets its owner with the theme's own front page and a demo
+# post. What a client should find instead is the same welcome the other
+# templates serve - as a static front page, so it stays editable like any page.
+cat > /tmp/orion-welcome.html <<'ORION_WP_WELCOME'
+<!-- wp:html -->
+<div style="max-width:34rem;margin:2rem auto;padding:2rem;background:#0b0c10;color:#e0e0e0;border-radius:12px;font-family:system-ui,sans-serif;line-height:1.6">
+<h1 style="margin:0 0 .5rem;font-size:1.6rem;color:#e0e0e0">@@BRAND@@<span style="color:#3b82f6">Hosting</span></h1>
+<p style="color:#9ca3af">Votre site WordPress est en ligne. Rendez-vous dans
+<code style="background:#111827;border:1px solid #1f2937;padding:.15rem .4rem;border-radius:4px">/wp-admin/</code>
+pour le composer.</p>
+<p style="color:#9ca3af">Panneau d'hébergement :
+<a style="color:#3b82f6" href="@@BASE_URL@@">@@BASE_URL@@</a></p>
+</div>
+<!-- /wp:html -->
+ORION_WP_WELCOME
+chown www-data:www-data /tmp/orion-welcome.html
+FRONT_ID=$(sudo -u www-data /usr/local/bin/wp post create /tmp/orion-welcome.html \
+             --post_type=page --post_title="Bienvenue" --post_status=publish --porcelain 2>/dev/null || true)
+if [ -n "${FRONT_ID:-}" ]; then
+  sudo -u www-data /usr/local/bin/wp option update show_on_front page >/dev/null
+  sudo -u www-data /usr/local/bin/wp option update page_on_front "${FRONT_ID}" >/dev/null
+  # Otherwise the theme prints the page title above the block. Harmless where
+  # the template slug does not exist - WordPress falls back to the default.
+  sudo -u www-data /usr/local/bin/wp post meta update "${FRONT_ID}" \
+    _wp_page_template page-no-title >/dev/null 2>&1 || true
+fi
+rm -f /tmp/orion-welcome.html
+
+# The demo post, the sample page and the draft privacy policy are WordPress's
+# own shop window, not the client's content. Immediately after an install they
+# are posts 1, 2 and 3 - matching on slug would miss them, because a French
+# install names them in French (hello-world is "bonjour-tout-le-monde").
+sudo -u www-data /usr/local/bin/wp post delete 1 2 3 --force >/dev/null 2>&1 || true
+for SLUG in hello-world sample-page privacy-policy \
+            bonjour-tout-le-monde page-d-exemple politique-de-confidentialite; do
+  IDS=$(sudo -u www-data /usr/local/bin/wp post list --post_type=any --name="${SLUG}" \
+          --field=ID --format=ids 2>/dev/null || true)
+  [ -n "${IDS}" ] && sudo -u www-data /usr/local/bin/wp post delete ${IDS} --force >/dev/null 2>&1 || true
+done
+
 step "Teaching WordPress it is behind a TLS proxy"
 # WordPress compares siteurl against how PHP sees the request. Handled in nginx
 # too; this covers anything that bypasses that path (WP-CLI, cron, REST).

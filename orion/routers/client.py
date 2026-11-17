@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from urllib.parse import quote
 
 from .. import activity, billing, db, identity, metrics, provision, services, sites, tasks
@@ -15,7 +15,7 @@ from ..deps import client_ip, fint, fstr, guard_csrf, require_user
 from ..hostinfo import detect, fits, headroom
 from ..incus import IncusError, incus
 from ..templating import render
-from ..util import days_from_now, now, rand_password, slugify
+from ..util import days_from_now, now, rand_password, slugify, snapshot_label
 
 router = APIRouter(prefix="/app")
 
@@ -106,29 +106,16 @@ def instance_context(instance, *, deep: bool = True) -> dict:
         if row:
             plan_memory = f"{row['memory_mb']} MB"
 
-    site_rows = sites.list_sites(instance["id"])
-    default_site = next((row for row in site_rows if row["is_primary"]), None)
-    if default_site is None and site_rows:
-        # Nothing is marked as the instance's own address - typically because it
-        # was removed. Prefer one that actually answers over one that may lead
-        # nowhere, and only pay for the scan in this case.
-        listening = services.listening_ports(instance["incus_name"])
-        default_site = (next((row for row in site_rows if row["upstream"] in listening), None)
-                        or site_rows[0])
-    default_domain = (default_site["domain"] if default_site
-                      else sites.default_domain(instance["slug"]))
     job = tasks.latest_for_instance(instance["id"])
     return {
+        **_route_rows(instance),
         "instance": instance,
         "metrics": figures,
         "live_status": live_status,
         "memory_cap": plan_memory,
         "snapshots": snapshot_rows,
-        "site_rows": site_rows,
-        "default_site": default_site,
-        "default_domain": default_domain,
-        "custom_sites": [s for s in site_rows if s is not default_site],
-        "tenant_domain": settings.domain,
+        "custom_sites": [s for s in sites.list_sites(instance["id"])
+                         if not s["is_primary"]],
         "ingress_ip": settings.ingress_ip,
         "steps": _job_steps(job),
         "job": job,
@@ -396,23 +383,27 @@ async def snapshot_create(request: Request, instance_id: int):
     # Incus refused it with a raw database error.
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
     requested = fstr(form, "label", "")
-    base = slugify(f"{instance['slug']}-{requested}-{stamp}" if requested
-                   else f"{instance['slug']}-{stamp}")
     existing = {s.get("name") for s in (incus.snapshots(instance["incus_name"]) or [])}
-    label, suffix = base, 2
+    label = snapshot_label(instance["slug"], requested, stamp)
+    suffix = 2
     while label in existing:
-        label = f"{base[:50]}-{suffix}"
+        label = snapshot_label(instance["slug"], requested, stamp, suffix=suffix)
         suffix += 1
 
     try:
         incus.snapshot_create(instance["incus_name"], label)
     except IncusError as exc:
-        detail = exc.detail
+        detail = (exc.detail or "").removeprefix("Error: ").strip()
         if "already exists" in detail:
             detail = f"Un instantané nommé {label} existe déjà. Réessayez dans une minute."
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(detail)}", status_code=303)
+        else:
+            detail = "Instantané refusé par Incus : " + detail
+        return _refuse(request, session, instance, "partials/instance_snapshots.html",
+                       detail, _snapshot_rows(instance))
     activity.log("instance.snapshot", user_id=session["uid"], target=instance["slug"], detail=label)
+    if _wants_fragment(request):
+        return _fragment(request, "partials/instance_snapshots.html", session,
+                         message=f"Instantané {label} créé", **_snapshot_rows(instance))
     return RedirectResponse(
         f"/app/instances/{instance_id}?ok={quote(f'Instantané {label} créé')}", status_code=303)
 
@@ -427,12 +418,16 @@ async def snapshot_restore(request: Request, instance_id: int, snapshot: str):
         return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
     try:
         incus.snapshot_restore(instance["incus_name"], snapshot)
-        activity.log("instance.snapshot_restore", user_id=session["uid"],
-                     target=instance["slug"], detail=snapshot)
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?ok=Restaur%C3%A9+depuis+{snapshot}", status_code=303)
     except IncusError as exc:
-        return RedirectResponse(f"/app/instances/{instance_id}?err={exc.detail}", status_code=303)
+        return _refuse(request, session, instance, "partials/instance_snapshots.html",
+                       exc.detail, _snapshot_rows(instance))
+    activity.log("instance.snapshot_restore", user_id=session["uid"],
+                 target=instance["slug"], detail=snapshot)
+    if _wants_fragment(request):
+        return _fragment(request, "partials/instance_snapshots.html", session,
+                         message=f"Restauré depuis {snapshot}", **_snapshot_rows(instance))
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok=Restaur%C3%A9+depuis+{snapshot}", status_code=303)
 
 
 @router.post("/instances/{instance_id}/snapshots/{snapshot}/delete")
@@ -446,7 +441,11 @@ async def snapshot_delete(request: Request, instance_id: int, snapshot: str):
     try:
         incus.snapshot_delete(instance["incus_name"], snapshot)
     except IncusError as exc:
-        return RedirectResponse(f"/app/instances/{instance_id}?err={exc.detail}", status_code=303)
+        return _refuse(request, session, instance, "partials/instance_snapshots.html",
+                       exc.detail, _snapshot_rows(instance))
+    if _wants_fragment(request):
+        return _fragment(request, "partials/instance_snapshots.html", session,
+                         message="Sauvegarde supprimée", **_snapshot_rows(instance))
     return RedirectResponse(f"/app/instances/{instance_id}?ok=Sauvegarde+supprim%C3%A9e", status_code=303)
 
 
@@ -466,6 +465,10 @@ async def site_make_primary(request: Request, site_id: int):
     activity.log("site.primary", user_id=session["uid"], target=site["domain"],
                  detail=site["slug"])
     message = f"{site['domain']} est désormais l'adresse principale de {site['slug']}."
+    instance = _owned(site["instance_id"], session)
+    if instance is not None and _wants_fragment(request):
+        return _fragment(request, "partials/instance_addresses.html", session,
+                         message=message, **_route_rows(instance))
     return RedirectResponse(
         f"/app/instances/{site['instance_id']}?ok={quote(message)}", status_code=303)
 
@@ -507,21 +510,33 @@ async def service_publish(request: Request, instance_id: int):
     # stopped the service between the scan and the click, and a route to a dead
     # port is a 502 they would have to debug themselves.
     if port not in services.listening_ports(instance["incus_name"]):
-        message = f"Rien n'écoute sur le port {port} dans votre instance pour le moment."
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(message)}", status_code=303)
+        return _refuse(request, session, instance, None,
+                       f"Rien n'écoute sur le port {port} dans votre instance pour le moment.")
 
     domain = services.address_for(instance["slug"], port, settings.domain)
     clash = db.one("SELECT * FROM sites WHERE domain = ?", (domain,))
     if clash is not None and clash["instance_id"] != instance_id:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(domain + ' est déjà utilisé.')}",
-            status_code=303)
+        return _refuse(request, session, instance, None, domain + " est déjà utilisé.")
 
     sites.add_site(instance_id, domain, port, primary=(port == 80))
     ok, message = sites.sync_caddy()
     activity.log("service.publish", user_id=session["uid"], target=domain,
                  detail=f"port {port}")
+    if _wants_fragment(request):
+        # Publishing adds a route, so the addresses card changes as well - sent
+        # out of band rather than by reloading the page around the terminal.
+        return _fragment(
+            request, "partials/instance_services.html", session,
+            message=(domain + f" publie le port {port}") if ok else "Routage non appliqué : " + message,
+            tone="ok" if ok else "err",
+            extra=_oob("instance-addresses", request, "partials/instance_addresses.html",
+                       session, **_route_rows(instance)),
+            found=services.discover(instance),
+            published={row["upstream"]: row for row in sites.list_sites(instance_id)},
+            orphan_rows=[row for row in sites.list_sites(instance_id)
+                         if row["upstream"] not in services.listening_ports(instance["incus_name"])],
+            default_domain=sites.default_domain(instance["slug"]),
+            tenant_domain=settings.domain)
     if not ok:
         return RedirectResponse(
             f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
@@ -529,6 +544,90 @@ async def service_publish(request: Request, instance_id: int):
     return RedirectResponse(
         f"/app/instances/{instance_id}?ok={quote(domain + f' publie le port {port}')}",
         status_code=303)
+
+
+# --------------------------------------------------------------------------- fragments
+#
+# An action on the instance page answers with the part of the page it changed
+# instead of a redirect, so acting never navigates away - which also means the
+# terminal session survives whatever the client just did.
+#
+# The plain redirect has to stay for forms posted without JavaScript, and every
+# refusal has to answer a fragment **too**: htmx follows a redirect, so a 303 on
+# an htmx request would swap the whole page into the fragment's target.
+
+
+def _wants_fragment(request: Request) -> bool:
+    """htmx sets this header; a plain form post does not, and must keep working."""
+    return request.headers.get("hx-request", "").lower() == "true"
+
+
+def _oob(element_id: str, request: Request, template: str, session, **context) -> str:
+    """The same partial, aimed at another element of the page."""
+    body = render(request, template, session=session, **context).body.decode()
+    return f'<div id="{element_id}" hx-swap-oob="true">{body}</div>'
+
+
+def _fragment(request: Request, template: str | None, session, *, message: str = "",
+              tone: str = "ok", extra: str = "", **context) -> HTMLResponse:
+    """A partial to swap in, with the message sent out of band."""
+    notice = render(request, "partials/flash.html", session=session,
+                    flash_ok=message if tone == "ok" else "",
+                    flash_err=message if tone == "err" else "").body.decode()
+    parts = [f'<div id="flash" hx-swap-oob="true">{notice}</div>']
+    if extra:
+        parts.append(extra)
+    if template:
+        parts.append(render(request, template, session=session, **context).body.decode())
+    return HTMLResponse("".join(parts))
+
+
+def _refuse(request: Request, session, instance, template: str | None, message: str,
+            context: dict | None = None):
+    """The same refusal: in place when htmx asked, as a redirect otherwise."""
+    if _wants_fragment(request):
+        return _fragment(request, template, session, message=message, tone="err",
+                         **(context or {}))
+    if instance is None:
+        return RedirectResponse("/app/instances?err=" + quote(message), status_code=303)
+    return RedirectResponse(
+        f"/app/instances/{instance['id']}?err={quote(message)}", status_code=303)
+
+
+def _route_rows(instance) -> dict:
+    """The addresses of an instance, and which one is its main one.
+
+    Shared by the page and by every action that changes an address, so the
+    fragment an action returns is built by the same rules as the page.
+    """
+    rows = sites.list_sites(instance["id"])
+    default_site = next((row for row in rows if row["is_primary"]), None)
+    if default_site is None and rows:
+        # Nothing is marked as the instance's own address - typically because it
+        # was removed. Prefer one that actually answers over one that may lead
+        # nowhere, and only pay for the scan in this case.
+        listening = services.listening_ports(instance["incus_name"])
+        default_site = (next((row for row in rows if row["upstream"] in listening), None)
+                        or rows[0])
+    return {
+        "instance": instance,
+        "site_rows": rows,
+        "default_site": default_site,
+        "tenant_domain": settings.domain,
+        "default_domain": (default_site["domain"] if default_site
+                           else sites.default_domain(instance["slug"])),
+    }
+
+
+def _snapshot_rows(instance) -> dict:
+    """The snapshots as they stand, for the fragment a snapshot action returns."""
+    rows: list = []
+    if instance["status"] != "destroyed":
+        try:
+            rows = incus.snapshots(instance["incus_name"]) or []
+        except IncusError:
+            rows = []
+    return {"instance": instance, "snapshots": rows}
 
 
 # Labels that must never become a tenant address: they either collide with
@@ -631,27 +730,29 @@ async def site_rename(request: Request, instance_id: int, site_id: int):
 
     problem = label_problem(label, instance_id=instance_id, site_id=site_id)
     if problem:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(problem)}", status_code=303)
+        return _refuse(request, session, instance, "partials/instance_addresses.html",
+                       problem, _route_rows(instance))
 
     domain = f"{label}{suffix}"
     try:
         db.execute("UPDATE sites SET domain = ? WHERE id = ?", (domain, site_id))
     except sqlite3.IntegrityError:
         # The checks above can lose a race against a create in another tab.
-        detail = f"{domain} vient d'être pris par une autre instance."
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(detail)}", status_code=303)
+        return _refuse(request, session, instance, "partials/instance_addresses.html",
+                       f"{domain} vient d'être pris par une autre instance.",
+                       _route_rows(instance))
 
     ok, message = sites.sync_caddy()
     activity.log("site.renamed", user_id=session["uid"], target=domain, detail=previous)
     if not ok:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
-            status_code=303)
+        return _refuse(request, session, instance, "partials/instance_addresses.html",
+                       "Routage non appliqué : " + message, _route_rows(instance))
+    text = previous + " devient " + domain
+    if _wants_fragment(request):
+        return _fragment(request, "partials/instance_addresses.html", session,
+                         message=text, **_route_rows(instance))
     return RedirectResponse(
-        f"/app/instances/{instance_id}?ok={quote(previous + ' devient ' + domain)}",
-        status_code=303)
+        f"/app/instances/{instance_id}?ok={quote(text)}", status_code=303)
 
 
 @router.post("/instances/{instance_id}/subdomain")
@@ -669,8 +770,8 @@ async def subdomain_set(request: Request, instance_id: int):
     problem = label_problem(label, instance_id=instance_id,
                             site_id=(primary["id"] if primary else None))
     if problem:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote(problem)}", status_code=303)
+        return _refuse(request, session, instance, "partials/instance_addresses.html",
+                       problem, _route_rows(instance))
 
     domain = f"{label}.{settings.domain}"
     if primary is None:
@@ -682,12 +783,14 @@ async def subdomain_set(request: Request, instance_id: int):
     activity.log("site.subdomain_set", user_id=session["uid"], target=domain,
                  detail=instance["slug"])
     if not ok:
-        return RedirectResponse(
-            f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
-            status_code=303)
+        return _refuse(request, session, instance, "partials/instance_addresses.html",
+                       "Routage non appliqué : " + message, _route_rows(instance))
+    text = f"Adresse mise à jour : {domain}"
+    if _wants_fragment(request):
+        return _fragment(request, "partials/instance_addresses.html", session,
+                         message=text, **_route_rows(instance))
     return RedirectResponse(
-        f"/app/instances/{instance_id}?ok={quote(f'Adresse mise à jour : {domain}')}",
-        status_code=303)
+        f"/app/instances/{instance_id}?ok={quote(text)}", status_code=303)
 
 
 @router.post("/instances/{instance_id}/sites")
@@ -734,6 +837,11 @@ async def site_delete(request: Request, site_id: int):
     sites.remove_site(site_id)
     sites.sync_caddy()
     activity.log("site.removed", user_id=session["uid"], target=site["domain"])
+    if _wants_fragment(request):
+        # The service list shows a "publié" badge for this route; it re-scans on
+        # its own within the minute rather than paying for a scan on every click.
+        return _fragment(request, "partials/instance_addresses.html", session,
+                         message=f"{site['domain']} retiré", **_route_rows(instance))
     return RedirectResponse(f"/app/instances/{instance['id']}?ok=Domaine+retir%C3%A9", status_code=303)
 
 

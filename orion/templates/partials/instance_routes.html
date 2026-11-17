@@ -1,0 +1,72 @@
+{# The instance's own addresses. Swapped in place by every action that changes
+   one, so renaming an address does not reload the page - which would take the
+   terminal session down with it. #}
+<div class="spread">
+  <div class="small" style="font-weight:600">Les adresses de cette instance</div>
+  <span class="tiny dim">une ligne par service publié</span>
+</div>
+{% if site_rows %}
+<div class="table-wrap mt2">
+  <table class="table">
+    <thead>
+      <tr><th>Adresse</th><th>Port local</th><th>Rôle</th><th class="num"></th></tr>
+    </thead>
+    <tbody>
+      {% for s in site_rows %}
+      <tr>
+        <td class="mono small">
+          {% if s['domain'].endswith('.' + tenant_domain) %}
+          {% set suffix_len = tenant_domain|length + 1 %}
+          {# Edited in place rather than deleted and recreated, which would take
+             the address offline for as long as Caddy takes to reload. #}
+          <form method="post"
+                action="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+                class="row tight"
+                hx-post="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+                hx-target="#instance-addresses" hx-swap="innerHTML">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input class="input input-sm mono" name="label" aria-label="Nom de l'adresse"
+                   value="{{ s['domain'][:-suffix_len] }}" style="width:11rem"
+                   spellcheck="false" autocapitalize="off">
+            <span class="dim">.{{ tenant_domain }}</span>
+            <button class="btn btn-sm btn-ghost" title="Renommer cette adresse">Renommer</button>
+          </form>
+          {% else %}
+          <a href="https://{{ s['domain'] }}" target="_blank" rel="noopener">{{ s['domain'] }}</a>
+          {% endif %}
+        </td>
+        <td class="mono small">:{{ s['upstream'] }}</td>
+        <td class="small">
+          {% if default_site and s['id'] == default_site['id'] %}
+            <span class="badge idle">principale</span>
+          {% else %}<span class="dim">—</span>{% endif %}
+        </td>
+        <td class="num">
+          <span class="row tight" style="justify-content:flex-end">
+            <button class="btn btn-sm btn-ghost" data-copy="https://{{ s['domain'] }}">Copier</button>
+            {% if not (default_site and s['id'] == default_site['id']) %}
+            <form method="post" action="/app/sites/{{ s['id'] }}/primary" class="inline-form"
+                  hx-post="/app/sites/{{ s['id'] }}/primary"
+                  hx-target="#instance-addresses" hx-swap="innerHTML">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-ghost"
+                      title="Afficher cette adresse dans la partie simple">Principale</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form"
+                  hx-post="/app/sites/{{ s['id'] }}/delete"
+                  hx-target="#instance-addresses" hx-swap="innerHTML"
+                  hx-confirm="Retirer {{ s['domain'] }} ? L'adresse cessera de répondre.">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-ghost">Retirer</button>
+            </form>
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="small dim mt2">Aucune adresse pour l'instant.</p>
+{% endif %}

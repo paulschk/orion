@@ -72,7 +72,7 @@
       {% if page_actions|trim %}
       <div class="content-actions">{{ page_actions }}</div>
       {% endif %}
-      {% include "partials/flash.html" %}
+      <div id="flash">{% include "partials/flash.html" %}</div>
       {% block content %}{% endblock %}
     </div>
   </div>
