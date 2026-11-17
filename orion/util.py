@@ -7,7 +7,7 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
-SYMBOLS = {"EUR": "\u20ac", "USD": "$", "GBP": "\u00a3", "CHF": "CHF "}
+SYMBOLS = {"EUR": "\u20ac", "USD": "$", "GBP": "\u00a3", "CHF": "CHF"}
 
 
 def now() -> str:
@@ -72,5 +72,14 @@ def human_bytes(num: int | float) -> str:
 
 
 def money(cents: int, currency: str = "EUR") -> str:
-    symbol = SYMBOLS.get(currency.upper(), currency + " ")
-    return f"{symbol}{cents / 100:.2f}"
+    """French formatting: comma decimal separator, symbol after the amount.
+
+    Producing "3,00 EUR" rather than "EUR3.00" matters here - these prices are
+    read by French customers on a French site.
+    """
+    amount = f"{cents / 100:.2f}".replace(".", ",")
+    code = (currency or "EUR").upper()
+    if code == "EUR":
+        return f"{amount}\u00a0\u20ac"          # 3,00 € (non-breaking space)
+    symbol = SYMBOLS.get(code, code)
+    return f"{symbol}{amount}"

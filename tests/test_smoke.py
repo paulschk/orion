@@ -34,8 +34,11 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(util.slugify("--x--"), "x")
 
     def test_money(self):
-        self.assertEqual(util.money(300, "EUR"), "\u20ac3.00")
-        self.assertEqual(util.money(1200, "EUR"), "\u20ac12.00")
+        # French convention: comma decimal separator, symbol after, nbsp before it.
+        self.assertEqual(util.money(300, "EUR"), "3,00\u00a0\u20ac")
+        self.assertEqual(util.money(1200, "EUR"), "12,00\u00a0\u20ac")
+        self.assertEqual(util.money(1050, "EUR"), "10,50\u00a0\u20ac")
+        self.assertEqual(util.money(500, "USD"), "$5.00")
 
     def test_human_mb(self):
         self.assertEqual(util.human_mb(512), "512 MB")
