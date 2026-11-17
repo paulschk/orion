@@ -17,7 +17,7 @@
         {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
         <tr>
           <td><span class="mono small">{{ i['slug'] }}</span>
-              <div class="tiny dim">{{ i['incus_name'] }}</div></td>
+              <div class="tiny dim">{{ i['machine_id'] or '—' }} · {{ i['ssh_user'] }}</div></td>
           <td class="small">{{ i['email'] }}</td>
           <td class="small">{{ i['plan_name'] or '—' }}</td>
           <td class="small"><span class="pill">{{ i['template'] }}</span></td>

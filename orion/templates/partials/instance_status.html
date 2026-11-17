@@ -1,5 +1,5 @@
 {% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
-<div class="row">
+<div class="row" data-instance-status="{{ instance['status'] }}">
   <span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span>
   {% if live_status and live_status != instance['status'] %}<span class="badge idle">Incus : {{ live_status }}</span>{% endif %}
   {% if instance['container_ip'] %}<span class="tiny dim mono">{{ instance['container_ip'] }}</span>{% endif %}

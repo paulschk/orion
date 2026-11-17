@@ -252,8 +252,21 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   padding: 12px 14px; font-family: var(--mono); font-size: 0.85rem;
   color: var(--text); overflow-x: auto; white-space: pre-wrap; word-break: break-all;
 }
+.term-pane {
+  height: 460px;
+  background: #05070d;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px 8px 10px;
+  overflow: hidden;
+}
+.term-pane .xterm { height: 100%; }
+.term-pane .xterm-viewport { background: transparent !important; }
+#terminal-status.ok { color: var(--ok); }
+#terminal-status.bad { color: var(--bad); }
+
 .terminal {
-  background: #0a0705; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: #05070d; border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 12px 14px; font-family: var(--mono); font-size: 0.8rem; line-height: 1.5;
   max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word;
   color: #d8c6ad;

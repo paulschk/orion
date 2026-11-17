@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from .. import activity, billing, db, provision, security, sites, tasks
+from .. import activity, billing, db, identity, provision, security, sites, tasks
 from ..config import settings
 from ..deps import client_ip, fint, fstr, guard_csrf, require_admin
 from ..hostinfo import allocation, detect, headroom, plan_capacity
@@ -112,6 +112,18 @@ async def instance_repair(request: Request, instance_id: int):
         incus.set_ssh_proxy(instance["incus_name"], port)
         db.execute("UPDATE instances SET ssh_port = ? WHERE id = ?", (port, instance_id))
         notes.append(f"port {port}")
+
+        # An instance created before per-machine identities still carries the
+        # shared default account. Repair is the deliberate migration path.
+        target = instance["ssh_user"]
+        if not target or target == settings.ssh_user:
+            taken = {r["ssh_user"] for r in db.query(
+                "SELECT ssh_user FROM instances WHERE id != ?", (instance_id,))}
+            target = identity.derive_ssh_user(instance["slug"], taken)
+        account, note = provision.ensure_ssh_account(instance, target)
+        if account and account != instance["ssh_user"]:
+            db.execute("UPDATE instances SET ssh_user = ? WHERE id = ?", (account, instance_id))
+        notes.append(note)
         ip = incus.primary_ip(instance["incus_name"])
         if ip:
             db.execute("UPDATE instances SET container_ip = ? WHERE id = ?", (ip, instance_id))

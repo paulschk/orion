@@ -17,7 +17,7 @@ os.environ.setdefault("ORION_SECRET_KEY", "test")
 # Keep the generated routing table out of the container-only /caddy mount.
 os.environ.setdefault("ORION_CADDY_CONFIG", "/tmp/orion-test-data/caddy.json")
 
-from orion import db, provision, sites, util  # noqa: E402
+from orion import db, identity, provision, sites, util  # noqa: E402
 from orion.hostinfo import Allocation, HostInfo, headroom, plan_capacity  # noqa: E402
 
 
@@ -161,6 +161,49 @@ class TestSites(unittest.TestCase):
 
         config = sites.build_caddy_config()
         self.assertEqual(config["apps"]["http"]["servers"]["orion"]["listen"], [settings.tenant_listen])
+
+
+class TestIdentity(unittest.TestCase):
+    def test_derives_from_the_slug(self):
+        self.assertEqual(identity.derive_ssh_user("vitrine", set()), "vitrine")
+
+    def test_never_returns_a_reserved_account(self):
+        for name in ("root", "admin", "www-data", "orion", "sshd"):
+            got = identity.derive_ssh_user(name, set())
+            self.assertNotIn(got, identity.RESERVED, f"{name} -> {got}")
+
+    def test_avoids_collisions(self):
+        first = identity.derive_ssh_user("vitrine", set())
+        second = identity.derive_ssh_user("vitrine", {first})
+        self.assertNotEqual(first, second)
+        self.assertTrue(second.startswith("vitrine"))
+
+    def test_sanitises_hostile_input(self):
+        self.assertEqual(identity.derive_ssh_user("ANGRY'; rm -rf / #", set()), "angryrm-rf")
+        self.assertEqual(identity.derive_ssh_user("", set()), "serveur")
+        self.assertEqual(identity.derive_ssh_user("!!!", set()), "serveur")
+
+    def test_prefixes_leading_digits_and_caps_length(self):
+        self.assertTrue(identity.derive_ssh_user("29-site", set()).startswith("u29-site"))
+        self.assertLessEqual(len(identity.derive_ssh_user("x" * 80, set())), identity.MAX_LEN)
+
+    def test_machine_id_shape(self):
+        mid = identity.new_machine_id()
+        self.assertTrue(mid.startswith("m-"))
+        self.assertEqual(len(mid), 8)
+        self.assertNotEqual(mid, identity.new_machine_id())
+
+    def test_ssh_config_block_is_usable(self):
+        block = identity.ssh_config_block(alias="vitrine", host="hosting.node29.fr",
+                                          port=20001, user="vitrine")
+        for expected in ("Host vitrine", "HostName hosting.node29.fr",
+                         "Port 20001", "User vitrine", "IdentitiesOnly yes"):
+            self.assertIn(expected, block)
+
+    def test_ssh_command_matches_the_documented_form(self):
+        self.assertEqual(
+            identity.ssh_command(host="hosting.node29.fr", port=20001, user="vitrine"),
+            "ssh -p 20001 vitrine@hosting.node29.fr")
 
 
 if __name__ == "__main__":

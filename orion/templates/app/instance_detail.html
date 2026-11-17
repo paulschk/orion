@@ -1,4 +1,7 @@
 {% extends "base_app.html" %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/vendor/xterm.min.css?v={{ asset_version }}">
+{% endblock %}
 {% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
 {% block title %}{{ instance['name'] }}{% endblock %}
 {% block breadcrumb %}<span class="breadcrumb"><a href="/app/instances">Mes instances</a> · {{ instance['slug'] }}</span>{% endblock %}
@@ -55,10 +58,18 @@
                 data-copy="{{ ssh_command }}">Copier</button></div>
         </div>
         <dl class="kv">
+          <dt>Identifiant machine</dt><dd class="mono">{{ instance['machine_id'] }}</dd>
           <dt>Hôte</dt><dd class="mono">{{ ssh_host }}</dd>
           <dt>Port</dt><dd class="mono">{{ instance['ssh_port'] }}</dd>
           <dt>Utilisateur</dt><dd class="mono">{{ instance['ssh_user'] }}</dd>
         </dl>
+        {% if ssh_config %}
+        <div>
+          <div class="tiny dim">Entrée ~/.ssh/config — plus de port à retenir</div>
+          <div class="codebox">{{ ssh_config }}<button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
+                data-copy="{{ ssh_config }}">Copier</button></div>
+        </div>
+        {% endif %}
       </div>
       {% if not user['ssh_public_key'] and instance['initial_password'] %}
         <div class="alert info mt2">
@@ -177,21 +188,20 @@
     </form>
   </div>
 
-  <div class="card" id="console">
-    <div class="card-h"><h2>Console</h2><span class="sub">Commande exécutée en root, dans votre instance</span></div>
-    <form hx-post="/app/instances/{{ instance['id'] }}/console"
-          hx-target="#console-out" hx-swap="innerHTML">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <div class="row tight">
-        <input class="input grow mono" name="command" placeholder="systemctl status nginx"
-               autocomplete="off" {{ 'disabled' if instance['status'] != 'running' }}>
-        <button class="btn" {{ 'disabled' if instance['status'] != 'running' }}>Exécuter</button>
-      </div>
-    </form>
-    <div id="console-out" class="mt2">
-      <div class="terminal dim">En attente d'une commande…</div>
-    </div>
+</div>
+
+<div class="card">
+  <div class="card-h">
+    <h2>Terminal</h2>
+    <span class="sub" id="terminal-status"></span>
   </div>
+  <div id="terminal" class="term-pane"
+       data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
+       data-state="{{ instance['status'] }}"></div>
+  <p class="tiny dim mt2">
+    Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
+    fonctionnent. Chaque ouverture de session est journalisée.
+  </p>
 </div>
 
 <div class="card">
@@ -220,5 +230,10 @@
     </div>
   </form>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<script src="/static/vendor/xterm.min.js?v={{ asset_version }}"></script>
+<script src="/static/vendor/addon-fit.min.js?v={{ asset_version }}"></script>
+<script src="/static/js/terminal.js?v={{ asset_version }}"></script>
 {% endblock %}

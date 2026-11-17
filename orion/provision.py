@@ -642,6 +642,65 @@ def power(instance_id: int, action: str) -> tuple[bool, str]:
     return True, "ok"
 
 
+def ensure_ssh_account(instance, target: str = "") -> tuple[str, str]:
+    """Make the container's SSH account match the instance's intended identity.
+
+    Returns (resulting_account_name, human note). Covers all three cases: the
+    wanted account already exists, an older one exists under a previous name
+    (renamed, carrying its home directory and keys), or none exists (created).
+
+    `target` lets the admin repair action move an instance that still uses the
+    shared default account onto its own name; without it we only verify.
+    """
+    desired = (target or instance["ssh_user"] or "").strip()
+    recorded = (instance["ssh_user"] or "").strip()
+    if not desired:
+        return recorded, "no account name recorded"
+
+    others = sorted({c for c in (recorded, settings.ssh_user) if c and c != desired})
+    probe_names = " ".join([desired] + others)
+    rc, out, err = incus.exec(
+        instance["incus_name"],
+        f"for u in {probe_names}; do id -u $u >/dev/null 2>&1 && echo $u; done",
+        timeout=60)
+    if rc != 0:
+        return recorded, f"could not inspect accounts: {(err or out).strip()[:160]}"
+    present = [line.strip() for line in out.splitlines() if line.strip()]
+
+    if desired in present:
+        return desired, f"account {desired} already present"
+
+    if present:
+        source = present[0]
+        script = (
+            f"set -e; "
+            f"usermod -l {desired} {source}; "
+            f"usermod -d /home/{desired} -m {desired}; "
+            f"groupmod -n {desired} {source} 2>/dev/null || true; "
+            f"rm -f /etc/sudoers.d/90-{source}; "
+            f'printf "{desired} ALL=(ALL) NOPASSWD:ALL\\n" > /etc/sudoers.d/90-{desired}; '
+            f"chmod 0440 /etc/sudoers.d/90-{desired}; "
+            f"systemctl is-active ssh >/dev/null 2>&1 || true; "
+            f"echo ok"
+        )
+        rc, out, err = incus.exec(instance["incus_name"], script, timeout=180)
+        if rc != 0:
+            return recorded, f"rename failed: {(err or out).strip()[:200]}"
+        return desired, f"compte renommé {source} -> {desired}"
+
+    script = (
+        f"set -e; useradd -m -s /bin/bash {desired}; usermod -aG sudo {desired}; "
+        f'printf "{desired} ALL=(ALL) NOPASSWD:ALL\\n" > /etc/sudoers.d/90-{desired}; '
+        f"chmod 0440 /etc/sudoers.d/90-{desired}; "
+        f"install -d -m 0700 -o {desired} -g {desired} /home/{desired}/.ssh 2>/dev/null || true; "
+        f"echo ok"
+    )
+    rc, out, err = incus.exec(instance["incus_name"], script, timeout=180)
+    if rc != 0:
+        return recorded, f"creation failed: {(err or out).strip()[:200]}"
+    return desired, f"compte {desired} créé"
+
+
 def reprovision_web(instance_id: int) -> None:
     """Re-apply the SSH proxy after a move, used by the admin repair action."""
     instance = db.one("SELECT * FROM instances WHERE id = ?", (instance_id,))

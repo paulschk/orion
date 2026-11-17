@@ -56,6 +56,24 @@ document.addEventListener('click', function (event) {
   });
 });
 
+// The status fragment polls itself. When the status actually changes - most
+// importantly provisioning -> running - reload once so the sections that only
+// make sense on a live instance (terminal, SSH details, snapshots) appear
+// without the user having to refresh by hand.
+document.body.addEventListener('htmx:afterSwap', function (event) {
+  const container = event.detail && event.detail.elt;
+  if (!container || container.id !== 'instance-status') return;
+  const fresh = container.querySelector('[data-instance-status]');
+  if (!fresh) return;
+  const next = fresh.dataset.instanceStatus;
+  const known = container.dataset.knownStatus;
+  container.dataset.knownStatus = next;
+  if (known === undefined || known === next) return;
+  if (next === 'running' || next === 'error') {
+    window.location.reload();
+  }
+});
+
 // Reveal a stored credential once.
 document.addEventListener('click', function (event) {
   const btn = event.target.closest('[data-reveal]');

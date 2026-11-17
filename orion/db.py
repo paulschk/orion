@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS instances (
     name             TEXT    NOT NULL,
     slug             TEXT    NOT NULL,
     incus_name       TEXT    NOT NULL UNIQUE,
+    machine_id       TEXT    NOT NULL DEFAULT '',
     template         TEXT    NOT NULL DEFAULT 'bare',
     status           TEXT    NOT NULL DEFAULT 'provisioning',
     container_ip     TEXT    NOT NULL DEFAULT '',
@@ -247,6 +248,47 @@ def set_setting(key: str, value: str) -> None:
     )
 
 
+def _columns(cur, table: str) -> set:
+    return {row[1] for row in cur.execute("PRAGMA table_info(" + table + ")").fetchall()}
+
+
+def migrate() -> None:
+    """Bring an existing database up to the current schema and backfill it.
+
+    Small enough to hand-roll: the panel runs on one host, and a migration that
+    silently does nothing is worse than an explicit one.
+    """
+    from . import identity
+
+    with cursor(commit=True) as cur:
+        if "machine_id" not in _columns(cur, "instances"):
+            cur.execute("ALTER TABLE instances ADD COLUMN machine_id TEXT NOT NULL DEFAULT ''")
+            print("[orion] schema: added instances.machine_id")
+
+    # Every instance gets a machine id. The SSH account name can only be changed
+    # safely for instances that were never provisioned: on a live container the
+    # account already exists as the old name, so renaming the row alone would
+    # lock the client out. Those are fixed by the admin "Réparer" action, which
+    # renames the account inside the container.
+    rows = query("SELECT id, slug, ssh_user, machine_id, ssh_port FROM instances "
+                 "WHERE status != 'destroyed'")
+    taken = {r["ssh_user"].lower() for r in rows if r["ssh_user"]}
+    for row in rows:
+        updates, params = [], []
+        if not row["machine_id"]:
+            updates.append("machine_id = ?")
+            params.append(identity.new_machine_id())
+        if row["ssh_port"] is None and (
+                not row["ssh_user"] or row["ssh_user"] == settings.ssh_user):
+            fresh = identity.derive_ssh_user(row["slug"], taken)
+            taken.add(fresh.lower())
+            updates.append("ssh_user = ?")
+            params.append(fresh)
+        if updates:
+            params.append(row["id"])
+            execute("UPDATE instances SET " + ", ".join(updates) + " WHERE id = ?", params)
+
+
 def init() -> None:
     """Create the schema and seed the first run. Idempotent."""
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -261,6 +303,8 @@ def init() -> None:
 
     with cursor(commit=True) as cur:
         cur.executescript(SCHEMA)
+
+    migrate()
 
     for key, value in SETTING_DEFAULTS.items():
         if one("SELECT 1 FROM settings WHERE key = ?", (key,)) is None:

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db, sites
 from .config import settings
-from .routers import admin, api, auth, client, public
+from .routers import admin, api, auth, client, public, terminal
 from .templating import BASE_DIR
 from .util import now
 
@@ -82,3 +82,4 @@ app.include_router(auth.router)
 app.include_router(client.router)
 app.include_router(admin.router)
 app.include_router(api.router)
+app.include_router(terminal.router)

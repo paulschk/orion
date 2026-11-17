@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from .. import activity, billing, db, provision, sites, tasks
+from .. import activity, billing, db, identity, provision, sites, tasks
 from ..config import settings
 from ..deps import client_ip, fint, fstr, guard_csrf, require_user
 from ..hostinfo import allocation, detect, fits, headroom
@@ -75,7 +75,13 @@ def instance_context(instance, *, deep: bool = True) -> dict:
         "job": tasks.latest_for_instance(instance["id"]),
         "ssh_host": settings.ssh_host,
         "ssh_command": (
-            f"ssh -p {instance['ssh_port']} {instance['ssh_user']}@{settings.ssh_host}"
+            identity.ssh_command(host=settings.ssh_host, port=instance["ssh_port"],
+                                 user=instance["ssh_user"])
+            if instance["ssh_port"] else ""
+        ),
+        "ssh_config": (
+            identity.ssh_config_block(alias=instance["slug"], host=settings.ssh_host,
+                                      port=instance["ssh_port"], user=instance["ssh_user"])
             if instance["ssh_port"] else ""
         ),
     }
@@ -173,13 +179,17 @@ async def instance_create(request: Request):
         ssh_key = session["ssh_public_key"]
 
     slug = unique_slug(name or f"{plan['slug']}-server")
+    # Each machine gets its own SSH account and its own identifier: a client is
+    # never "orion" on every box, and support can refer to one machine by name.
+    taken = {r["ssh_user"] for r in db.query("SELECT ssh_user FROM instances")}
+    ssh_user = identity.derive_ssh_user(slug, taken)
     instance_id = db.execute(
-        "INSERT INTO instances(user_id, plan_id, name, slug, incus_name, template, status, "
-        "ssh_user, initial_password, created_at, expires_at) "
-        "VALUES(?, ?, ?, ?, ?, ?, 'provisioning', ?, ?, ?, ?)",
+        "INSERT INTO instances(user_id, plan_id, name, slug, incus_name, machine_id, template, "
+        "status, ssh_user, initial_password, created_at, expires_at) "
+        "VALUES(?, ?, ?, ?, ?, ?, ?, 'provisioning', ?, ?, ?, ?)",
         (session["uid"], plan["id"], name or slug, slug,
-         provision.incus_name_for(session["uid"], slug), tpl.slug,
-         settings.ssh_user, rand_password(20), now(),
+         provision.incus_name_for(session["uid"], slug), identity.new_machine_id(), tpl.slug,
+         ssh_user, rand_password(20), now(),
          days_from_now(plan["period_days"])),
     )
 
@@ -283,31 +293,6 @@ async def snapshot_delete(request: Request, instance_id: int, snapshot: str):
     except IncusError as exc:
         return RedirectResponse(f"/app/instances/{instance_id}?err={exc.detail}", status_code=303)
     return RedirectResponse(f"/app/instances/{instance_id}?ok=Sauvegarde+supprim%C3%A9e", status_code=303)
-
-
-@router.post("/instances/{instance_id}/console")
-async def console(request: Request, instance_id: int):
-    """Run one command as root inside the tenant's own container."""
-    session = require_user(request)
-    form = await request.form()
-    guard_csrf(request, session, form)
-    instance = _owned(instance_id, session)
-    if instance is None:
-        return render(request, "partials/console_output.html", session=session,
-                      output="", error="Instance introuvable.", command="")
-    command = fstr(form, "command")
-    if not command:
-        return render(request, "partials/console_output.html", session=session,
-                      output="", error="", command="")
-    try:
-        rc, out, err = incus.exec(instance["incus_name"], command, timeout=120)
-    except IncusError as exc:
-        return render(request, "partials/console_output.html", session=session,
-                      output="", error=exc.detail, command=command)
-    activity.log("instance.console", user_id=session["uid"], target=instance["slug"],
-                 detail=command[:200], ip=client_ip(request))
-    return render(request, "partials/console_output.html", session=session,
-                  output=out, error=err, command=command, rc=rc)
 
 
 @router.post("/instances/{instance_id}/sites")
