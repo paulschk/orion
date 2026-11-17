@@ -115,6 +115,41 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
   }
 });
 
+
+// App shell: below the breakpoint the sidebar is an off-canvas drawer opened
+// from the burger in the top bar. It used to wrap into a cramped row of links.
+(function () {
+  var toggle = document.getElementById('side-toggle');
+  var side = document.getElementById('side');
+  var scrim = document.getElementById('side-scrim');
+  if (!toggle || !side) return;
+
+  function setOpen(open) {
+    side.classList.toggle('open', open);
+    if (scrim) scrim.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  function close() { setOpen(false); }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    setOpen(!side.classList.contains('open'));
+  });
+  if (scrim) scrim.addEventListener('click', close);
+  side.addEventListener('click', function (e) {
+    if (e.target.closest('a')) close();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+  var wide = window.matchMedia('(min-width: 901px)');
+  if (wide.addEventListener) wide.addEventListener('change', close);
+  else if (wide.addListener) wide.addListener(close);
+  close();
+})();
+
 // Reveal a stored credential once.
 document.addEventListener('click', function (event) {
   const btn = event.target.closest('[data-reveal]');

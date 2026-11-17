@@ -56,4 +56,33 @@
     el.classList.add('reveal');
     io.observe(el);
   });
+
+  // ---------------------------------------------------------------- burger
+  // A real disclosure control: aria-expanded, closes on Escape, on an outside
+  // click, and on link activation - the things a client actually expects.
+  var pnavToggle = document.getElementById('pnav-toggle');
+  var pnavMenu = document.getElementById('pnav-menu');
+  if (pnavToggle && pnavMenu) {
+    var setPnav = function (open) {
+      pnavMenu.classList.toggle('open', open);
+      pnavToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      pnavToggle.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+    };
+    pnavToggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setPnav(pnavToggle.getAttribute('aria-expanded') !== 'true');
+    });
+    pnavMenu.addEventListener('click', function (e) {
+      if (e.target.closest('a')) { setPnav(false); }
+    });
+    document.addEventListener('click', function (e) {
+      if (!pnavMenu.contains(e.target) && !pnavToggle.contains(e.target)) { setPnav(false); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { setPnav(false); }
+    });
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 768) { setPnav(false); }
+    });
+  }
 })();

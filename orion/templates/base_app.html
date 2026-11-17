@@ -12,7 +12,7 @@
 </head>
 <body>
 <div class="shell">
-  <aside class="side">
+  <aside class="side" id="side">
     <div class="brand">
       <a href="/" class="logo">{{ brand }}<span class="num">Hosting</span></a>
       <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
@@ -45,10 +45,15 @@
       <a class="nav" href="/logout">Déconnexion</a>
     </div>
   </aside>
+  <div class="side-scrim" id="side-scrim"></div>
 
   <div class="main">
     <header class="topbar">
-      <div>
+      <button class="nav-toggle" type="button" id="side-toggle"
+              aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="side">
+        <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
+      <div class="topbar-titles">
         {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting</span>{% endblock %}
         <h1>{% block heading %}{{ app_name }}{% endblock %}</h1>
       </div>

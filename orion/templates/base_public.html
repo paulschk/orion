@@ -12,7 +12,11 @@
 <div class="pnav">
   <div class="container">
     <a href="/" class="logo">{{ brand }}<span class="num">Hosting</span></a>
-    <nav>
+    <button class="nav-toggle" type="button" id="pnav-toggle"
+            aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="pnav-menu">
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    <nav id="pnav-menu">
       <a href="/tarifs" class="{{ 'active' if path == '/tarifs' }}">Tarifs</a>
       {% if user %}
         <a href="{{ '/admin' if user['role'] == 'admin' else '/app' }}">{{ 'Administration' if user['role'] == 'admin' else 'Mon espace' }}</a>
