@@ -131,6 +131,11 @@ def build_caddy_config() -> dict:
                         "listen": [settings.tenant_listen],
                         "routes": routes,
                         "logs": {},
+                        # TLS is terminated by the edge Caddy. Without this,
+                        # Caddy sees the host matchers and tries to obtain a
+                        # certificate for every tenant domain itself, and
+                        # injects HTTP->HTTPS redirects on this plain listener.
+                        "automatic_https": {"disable": True},
                     }
                 }
             }

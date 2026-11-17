@@ -30,7 +30,8 @@
               "terminal": true
             }
           ],
-          "logs": {}
+          "logs": {},
+          "automatic_https": { "disable": true }
         }
       }
     }
