@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("ORION_DATA_DIR", "/tmp/orion-test-data")
 os.environ.setdefault("ORION_SECRET_KEY", "test")
+# Keep the generated routing table out of the container-only /caddy mount.
+os.environ.setdefault("ORION_CADDY_CONFIG", "/tmp/orion-test-data/caddy.json")
 
 from orion import db, provision, sites, util  # noqa: E402
 from orion.hostinfo import Allocation, HostInfo, headroom, plan_capacity  # noqa: E402

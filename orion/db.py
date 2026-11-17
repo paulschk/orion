@@ -251,7 +251,13 @@ def init() -> None:
     """Create the schema and seed the first run. Idempotent."""
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.jobs_dir.mkdir(parents=True, exist_ok=True)
-    settings.caddy_config_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        settings.caddy_config_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # sites.sync_caddy() already degrades gracefully when it cannot persist
+        # the routing table, so a missing or unwritable mount must not stop the
+        # panel from starting.
+        pass
 
     with cursor(commit=True) as cur:
         cur.executescript(SCHEMA)

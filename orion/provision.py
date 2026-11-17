@@ -448,14 +448,22 @@ def _wait_for_ip(name: str, timeout: int = 120) -> str:
     return ""
 
 
-def _wait_for_ssh(name: str, timeout: int = 240) -> bool:
-    """sshd is up when we can run a command over exec."""
+def _wait_for_exec(name: str, timeout: int = 180) -> bool:
+    """The container is ready once it accepts a trivial exec.
+
+    Deliberately not "wait for sshd": the base image ships no sshd, and it is
+    the provisioning script itself that installs and starts it. Waiting for the
+    daemon before running that script can only ever time out.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
-        rc, _, _ = incus.exec(name, "systemctl is-active ssh", timeout=30)
+        try:
+            rc, _, _ = incus.exec(name, ["true"], timeout=20)
+        except IncusError:
+            rc = 1
         if rc == 0:
             return True
-        time.sleep(5)
+        time.sleep(3)
     return False
 
 
@@ -501,9 +509,9 @@ def provision(job_id: int, instance_id: int) -> str:
             fail("The container never obtained an IP address.")
             return "\n".join(log)
 
-        emit("== Waiting for SSH inside the container")
-        if not _wait_for_ssh(name):
-            fail("sshd never came up inside the container.")
+        emit("== Waiting for the container to accept commands")
+        if not _wait_for_exec(name):
+            fail("The container never became responsive to exec.")
             return "\n".join(log)
 
         emit("== Publishing SSH on the host")
@@ -548,6 +556,10 @@ def provision(job_id: int, instance_id: int) -> str:
         if rc != 0:
             fail(f"Provisioning script exited with code {rc}. See the log above.")
             return "\n".join(log)
+
+        rc, _, _ = incus.exec(name, "systemctl is-active ssh", timeout=30)
+        if rc != 0:
+            emit("!! sshd is not active after provisioning")
 
         db.execute("UPDATE instances SET status = 'running', error = '', updated_at = ? WHERE id = ?",
                    (now(), instance_id))
