@@ -1,19 +1,19 @@
 /* Orion — node29 palette, flat, restrained. One stylesheet, no build step. */
 
 :root {
-  --bg: #0f0b07;
-  --bg-alt: #1a120b;
-  --card: #1f150d;
-  --border: #3d2814;
-  --border-soft: #2a1c10;
-  --text: #f5e6d3;
-  --text-muted: #c4a882;
-  --text-dim: #8a7458;
-  --accent: #f97316;
-  --accent-dark: #ea580c;
-  --accent-soft: rgba(249, 115, 22, 0.12);
-  --tag-bg: #3d2814;
-  --tag-text: #fdba74;
+  --bg: #0b0c10;
+  --bg-alt: #111318;
+  --card: #111827;
+  --border: #1f2937;
+  --border-soft: #171a21;
+  --text: #e0e0e0;
+  --text-muted: #9ca3af;
+  --text-dim: #6b7280;
+  --accent: #3b82f6;
+  --accent-dark: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --tag-bg: #1f2937;
+  --tag-text: #93c5fd;
   --ok: #86efac;
   --ok-bg: rgba(74, 222, 128, 0.13);
   --warn: #fcd34d;
@@ -146,7 +146,7 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); bo
   font-family: inherit; cursor: pointer; text-decoration: none; transition: .14s;
 }
 .btn:hover { border-color: var(--accent); text-decoration: none; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #17100a; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 .btn-danger { background: transparent; border-color: #6b2b2b; color: var(--bad); }
 .btn-danger:hover { border-color: var(--bad); background: var(--bad-bg); }

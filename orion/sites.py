@@ -21,25 +21,25 @@ log = logging.getLogger("orion.sites")
 
 NOT_FOUND_PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>Site inconnu - {brand}</title>
-<style>body{{margin:0;background:#0f0b07;color:#f5e6d3;font:16px/1.6 system-ui,sans-serif;
+<style>body{{margin:0;background:#0b0c10;color:#e0e0e0;font:16px/1.6 system-ui,sans-serif;
 display:flex;min-height:100vh;align-items:center;justify-content:center}}
 .c{{max-width:32rem;padding:2rem}}h1{{margin:0 0 .5rem;font-size:1.5rem}}
-.n{{color:#f97316}}p{{color:#c4a882}}code{{background:#1f150d;border:1px solid #3d2814;
+.n{{color:#3b82f6}}p{{color:#9ca3af}}code{{background:#111827;border:1px solid #1f2937;
 padding:.15rem .4rem;border-radius:4px}}</style></head><body><div class="c">
 <h1>{brand}<span class="n">Hosting</span></h1>
 <p>Ce nom d&apos;h&ocirc;te n&apos;est rattach&eacute; &agrave; aucune instance.</p>
-<p><a style="color:#f97316" href="{base_url}">{base_url}</a></p>
+<p><a style="color:#3b82f6" href="{base_url}">{base_url}</a></p>
 </div></body></html>"""
 
 UNAVAILABLE_PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>Instance arr&ecirc;t&eacute;e - {brand}</title>
-<style>body{{margin:0;background:#0f0b07;color:#f5e6d3;font:16px/1.6 system-ui,sans-serif;
+<style>body{{margin:0;background:#0b0c10;color:#e0e0e0;font:16px/1.6 system-ui,sans-serif;
 display:flex;min-height:100vh;align-items:center;justify-content:center}}
 .c{{max-width:32rem;padding:2rem}}h1{{margin:0 0 .5rem;font-size:1.5rem}}
-.n{{color:#f97316}}p{{color:#c4a882}}</style></head><body><div class="c">
+.n{{color:#3b82f6}}p{{color:#9ca3af}}</style></head><body><div class="c">
 <h1>{brand}<span class="n">Hosting</span></h1>
 <p>Le site <code>{domain}</code> existe, mais son instance n&apos;est pas en ligne.</p>
-<p>D&eacute;marrez-la depuis le panneau : <a style="color:#f97316" href="{base_url}">{base_url}</a></p>
+<p>D&eacute;marrez-la depuis le panneau : <a style="color:#3b82f6" href="{base_url}">{base_url}</a></p>
 </div></body></html>"""
 
 

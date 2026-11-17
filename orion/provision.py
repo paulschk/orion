@@ -166,13 +166,13 @@ cat > /var/www/@@HOSTNAME@@/index.html <<'ORION_INDEX'
 <html lang="fr"><head><meta charset="utf-8">
 <title>@@HOSTNAME@@@@DOMAIN_SUFFIX@@</title>
 <style>
- body{margin:0;background:#0f0b07;color:#f5e6d3;font:16px/1.6 system-ui,sans-serif;
+ body{margin:0;background:#0b0c10;color:#e0e0e0;font:16px/1.6 system-ui,sans-serif;
       display:flex;min-height:100vh;align-items:center;justify-content:center}
  .c{max-width:34rem;padding:2rem}
  h1{margin:0 0 .5rem;font-size:1.6rem}
- .n{color:#f97316}
- p{color:#c4a882}
- code{background:#1f150d;border:1px solid #3d2814;padding:.15rem .4rem;border-radius:4px}
+ .n{color:#3b82f6}
+ p{color:#9ca3af}
+ code{background:#111827;border:1px solid #1f2937;padding:.15rem .4rem;border-radius:4px}
 </style></head><body><div class="c">
 <h1>@@BRAND@@<span class="n">Hosting</span></h1>
 <p>Votre instance est en ligne. D&eacute;posez vos fichiers dans
@@ -293,10 +293,10 @@ http.createServer((req, res) => {
   res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <title>@@HOSTNAME@@</title>
-<style>body{margin:0;background:#0f0b07;color:#f5e6d3;font:16px/1.6 system-ui,sans-serif;
+<style>body{margin:0;background:#0b0c10;color:#e0e0e0;font:16px/1.6 system-ui,sans-serif;
 display:flex;min-height:100vh;align-items:center;justify-content:center}
 .c{padding:2rem;max-width:34rem}h1{margin:0 0 .5rem;font-size:1.6rem}
-.n{color:#f97316}p{color:#c4a882}code{background:#1f150d;border:1px solid #3d2814;
+.n{color:#3b82f6}p{color:#9ca3af}code{background:#111827;border:1px solid #1f2937;
 padding:.15rem .4rem;border-radius:4px}</style></head>
 <body><div class="c"><h1>@@BRAND@@<span class="n">Hosting</span></h1>
 <p>Application Node.js en ligne sur <code>@@HOSTNAME@@@@DOMAIN_SUFFIX@@</code>.</p>

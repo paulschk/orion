@@ -1,12 +1,13 @@
 {% extends "base_public.html" %}
-{% block title %}Tarifs{% endblock %}
+{% block title %}Offres et tarifs{% endblock %}
+{% block description %}Quatre formules d'hébergement Linux de 3 à 24 euros par mois. Sans engagement, SSH et sauvegardes inclus.{% endblock %}
 {% block content %}
 <div class="container" style="padding:56px 24px 0">
-  <span class="eyebrow">Tarifs</span>
-  <h1 style="font-size:2rem;margin-bottom:12px">Le prix de l'offre, et rien d'autre.</h1>
-  <p class="muted" style="max-width:620px">
-    Pas de facturation à l'usage, pas de frais de dépassement. Chaque offre est un plafond réel,
-    appliqué par le noyau de la machine d'hébergement.
+  <span class="eyebrow">Offres</span>
+  <h1 style="font-size:2rem;margin-bottom:12px">Un prix, des ressources, rien d'autre.</h1>
+  <p class="muted" style="max-width:640px">
+    Chaque formule correspond à des ressources réellement réservées sur la machine, appliquées par le
+    noyau&nbsp;: votre voisin ne peut pas consommer votre mémoire. Paiement mensuel, résiliable à tout moment.
   </p>
 </div>
 
@@ -30,8 +31,9 @@
           {% endif %}
         </ul>
         <p class="small dim grow">{{ plan['description'] }}</p>
-        <a class="btn {{ 'btn-primary' if loop.first else '' }}"
-           href="{{ '/register' if signup_open else '/login' }}?plan={{ plan['slug'] }}">Choisir cette offre</a>
+        <a class="btn btn-primary" href="{{ '/register' if signup_open else '/login' }}?plan={{ plan['slug'] }}">
+          Commander cette offre
+        </a>
       </div>
       {% endfor %}
     </div>
@@ -39,7 +41,7 @@
     <div class="card flat mt3">
       <div class="spread">
         <div>
-          <h3 style="font-size:.95rem">Capacité de cette machine</h3>
+          <h3 style="font-size:.95rem">Capacité de la machine</h3>
           <p class="small dim">Mise à jour à chaque chargement de page, lue depuis l'hyperviseur.</p>
         </div>
         <div class="row">
@@ -49,27 +51,43 @@
           <span class="badge idle">{{ headroom.instances }} instance{{ 's' if headroom.instances != 1 }} en service</span>
         </div>
       </div>
+      <p class="tiny dim mt2">
+        Les offres sont volontairement limitées à ce que cette machine peut porter&nbsp;: quand il ne reste
+        plus de place, la commande est refusée plutôt que de dégrader le service des clients déjà installés.
+      </p>
     </div>
 
     <div class="grid cols-2 mt3">
       <div class="card">
-        <h3 style="font-size:.95rem">Ce qui est inclus</h3>
+        <h3 style="font-size:.95rem">Inclus dans chaque offre</h3>
         <ul class="plan-card" style="margin-top:10px">
-          <li>Accès SSH complet (clé ou mot de passe)</li>
+          <li>Un compte SSH personnel et un accès root</li>
           <li>Console web dans le navigateur</li>
           <li>Instantanés à la demande</li>
-          <li>Modèles LEMP, WordPress, Node.js, Docker</li>
-          <li>Nom de domaine routé automatiquement</li>
+          <li>Un sous-domaine sur {{ domain }} avec HTTPS automatique</li>
+          <li>Votre propre nom de domaine si vous en avez un</li>
+          <li>Nginx, PHP, MariaDB, Node.js, Docker au choix</li>
         </ul>
       </div>
       <div class="card">
-        <h3 style="font-size:.95rem">Ce qui n'est pas inclus</h3>
+        <h3 style="font-size:.95rem">Ce que je ne fais pas</h3>
         <ul class="plan-card" style="margin-top:10px">
-          <li>Nom de domaine (vous apportez le vôtre)</li>
-          <li>Adresses e-mail</li>
-          <li>SLA contractuel — c'est un hébergement de proximité</li>
-          <li>Extensions propriétaires (cPanel et consorts)</li>
+          <li>Aucun engagement de durée</li>
+          <li>Aucun frais de dépassement, les quotas sont des plafonds</li>
+          <li>Aucune revente à un grand cloud</li>
+          <li>Pas d'adresses e-mail hébergées</li>
+          <li>Pas de SLA contractuel — hébergement de proximité, assumé</li>
         </ul>
+      </div>
+    </div>
+
+    <div class="card mt3">
+      <div class="spread">
+        <div>
+          <h3 style="font-size:.95rem">Une question avant de commander&nbsp;?</h3>
+          <p class="small dim">Écrivez-moi, je réponds directement.</p>
+        </div>
+        <a class="btn" href="https://node29.fr/#contact">Contacter {{ brand }}</a>
       </div>
     </div>
   </div>

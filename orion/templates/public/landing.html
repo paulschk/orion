@@ -1,92 +1,71 @@
 {% extends "base_public.html" %}
-{% block title %}Hébergement de petits serveurs virtuels{% endblock %}
+{% block title %}Hébergement Linux à partir de {{ plans[0]['price_cents']|money if plans else '3,00 €' }} par mois{% endblock %}
+{% block description %}Hébergement Linux simple et abordable : serveurs virtuels, sites web, WordPress. SSH, sauvegardes et console web inclus.{% endblock %}
 {% block content %}
 
 <div class="hero">
   <div class="container">
-    <span class="eyebrow">Auto-hébergé · {{ info.host_name }}</span>
-    <h1>Un vrai serveur pour votre site, à partir de {{ plans[0]['price_cents']|money if plans else '3,00 €' }} par mois.</h1>
+    <span class="eyebrow">Hébergement · {{ brand }}</span>
+    <h1>Votre site en ligne dès aujourd'hui, à partir de {{ plans[0]['price_cents']|money if plans else '3,00 €' }} par mois.</h1>
     <p class="lead">
-      Des instances Linux complètes — SSH, systemd, quotas réels — hébergées sur une seule
-      machine chez {{ brand }}, pas dans un cloud facturé au dépassement.
+      Hébergement Linux pour sites web, blogs WordPress et petites applications.
+      Une adresse, un accès SSH, des sauvegardes&nbsp;: ce qu'un hébergeur classique
+      propose, à un prix honnête et sans engagement.
     </p>
     <div class="row">
-      <a class="btn btn-primary" href="{{ '/register' if signup_open else '/tarifs' }}">Créer mon instance</a>
-      <a class="btn" href="/tarifs">Voir les tarifs</a>
+      <a class="btn btn-primary" href="/tarifs">Voir les offres</a>
+      <a class="btn" href="/login">Espace client</a>
     </div>
     <p class="small dim mt3">
-      {{ info.sellable_vcpu }} vCPU et {{ info.sellable_ram_mb|human_mb }} de RAM sont disponibles
-      sur cette machine · {{ info.incus_version and 'Incus ' ~ info.incus_version }}
+      Paiement mensuel, résiliable à tout moment · {{ info.sellable_vcpu }} vCPU et
+      {{ info.sellable_ram_mb|human_mb }} de RAM disponibles sur cette machine
     </p>
   </div>
 </div>
 
 <section>
   <div class="container">
-    <h2 class="section-title">Ce que vous obtenez</h2>
-    <p class="section-lead">Le confort d'un hébergement classique, sans la boîte noire.</p>
-    <div class="grid cols-3">
+    <h2 class="section-title">Inclus dans toutes les offres</h2>
+    <p class="section-lead">Pas d'option cachée, pas de supplément à la ligne.</p>
+    <div class="grid cols-4">
       <div class="card feature">
-        <h3>Une vraie machine</h3>
-        <p>Conteneur système Incus : vous êtes root, systemd fonctionne, <code>apt</code> fonctionne.
-           Ce n'est pas un espace web limité.</p>
+        <h3>Nom de domaine géré</h3>
+        <p>Un sous-domaine offert, et la possibilité d'utiliser votre propre nom de domaine.</p>
       </div>
       <div class="card feature">
-        <h3>SSH et console web</h3>
-        <p>Clé SSH ou mot de passe, au choix. Et un terminal dans le navigateur pour les
-           dépannages rapides.</p>
+        <h3>Accès SSH complet</h3>
+        <p>Votre propre compte, vos propres droits. Installez ce que vous voulez.</p>
       </div>
       <div class="card feature">
-        <h3>Des quotas honnêtes</h3>
-        <p>CPU, mémoire et disque sont réellement plafonnés au niveau du noyau.
-           Vous ne subissez pas les voisins.</p>
+        <h3>Console web</h3>
+        <p>Un terminal dans le navigateur, sans rien installer, pour intervenir en déplacement.</p>
       </div>
       <div class="card feature">
         <h3>Sauvegardes instantanées</h3>
         <p>Un instantané avant chaque mise à jour risquée, restauration en un clic.</p>
       </div>
       <div class="card feature">
-        <h3>Modèles prêts à l'emploi</h3>
-        <p>Serveur nu, LEMP, WordPress, Node.js ou Docker. Ou installez ce que vous voulez.</p>
+        <h3>Quotas garantis</h3>
+        <p>CPU, mémoire et disque réservés pour vous, appliqués par le noyau.</p>
       </div>
       <div class="card feature">
-        <h3>Prix plat</h3>
-        <p>Pas de facturation à l'usage, pas de surprise. Le prix de l'offre, rien d'autre.</p>
+        <h3>Technologies actuelles</h3>
+        <p>Nginx, PHP, MariaDB, Node.js, Docker. Aucune version figée depuis dix ans.</p>
       </div>
-    </div>
-  </div>
-</section>
-
-<section class="alt">
-  <div class="container">
-    <div class="spread">
-      <div>
-        <h2 class="section-title">Comment ça marche</h2>
-        <p class="section-lead" style="margin-bottom:0">De la commande à la ligne SSH en trois étapes.</p>
+      <div class="card feature">
+        <h3>Installation en une minute</h3>
+        <p>Serveur nu, site web, WordPress ou application Node&nbsp;: le panneau s'occupe du reste.</p>
       </div>
-    </div>
-    <div class="grid cols-3 mt3">
-      <div class="card">
-        <span class="pill">1</span>
-        <h3 class="mt2">Choisissez une offre</h3>
-        <p class="muted small">vCPU, mémoire et disque déduits de ce que la machine peut réellement porter.</p>
-      </div>
-      <div class="card">
-        <span class="pill">2</span>
-        <h3 class="mt2">Choisissez un modèle</h3>
-        <p class="muted small">Serveur nu, ou site prêt à l'emploi. Le panneau installe le reste.</p>
-      </div>
-      <div class="card">
-        <span class="pill">3</span>
-        <h3 class="mt2">Connectez-vous</h3>
-        <p class="muted small">Une adresse, un port, une clé. Votre instance est en ligne sous une minute.</p>
+      <div class="card feature">
+        <h3>Un vrai interlocuteur</h3>
+        <p>Structure à taille humaine. Vous écrivez, c'est moi qui réponds.</p>
       </div>
     </div>
   </div>
 </section>
 
 {% if plans %}
-<section>
+<section class="alt">
   <div class="container">
     <h2 class="section-title">Les offres</h2>
     <p class="section-lead">Prix mensuel, sans engagement. Capacité restante affichée en direct.</p>
@@ -104,7 +83,7 @@
           <li>{{ plan['sites'] }} site{{ 's' if plan['sites'] > 1 }}</li>
         </ul>
         <p class="small dim">{{ plan['description'] }}</p>
-        <a class="btn {{ 'btn-primary' if loop.first else '' }}" href="{{ '/register' if signup_open else '/login' }}?plan={{ plan['slug'] }}">Choisir</a>
+        <a class="btn {{ 'btn-primary' if loop.first else '' }}" href="/tarifs">Choisir</a>
       </div>
       {% endfor %}
     </div>
@@ -112,19 +91,74 @@
 </section>
 {% endif %}
 
+<section>
+  <div class="container">
+    <h2 class="section-title">Comment ça marche</h2>
+    <p class="section-lead">De la commande au site en ligne, sans appel au support.</p>
+    <div class="grid cols-3 mt3">
+      <div class="card">
+        <span class="pill">1</span>
+        <h3 class="mt2">Choisissez une offre</h3>
+        <p class="muted small">Quatre formules, de 3 à 24 € par mois. Le prix affiché est le prix final.</p>
+      </div>
+      <div class="card">
+        <span class="pill">2</span>
+        <h3 class="mt2">Votre serveur est créé</h3>
+        <p class="muted small">Provisionné en une minute, avec les ressources exactes de l'offre choisie.</p>
+      </div>
+      <div class="card">
+        <span class="pill">3</span>
+        <h3 class="mt2">Publiez votre site</h3>
+        <p class="muted small">Par SSH, ou en laissant le panneau installer WordPress pour vous.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="alt">
-  <div class="container narrow center">
-    <h2 class="section-title">Prêt à essayer ?</h2>
-    <p class="section-lead" style="margin:0 auto 24px">
-      {% if signup_open %}
-        Créez un compte, le panneau détecte la machine et provisionne votre instance.
-      {% else %}
-        Les inscriptions sont actuellement fermées. Écrivez-nous pour un accès.
-      {% endif %}
-    </p>
-    <a class="btn btn-primary" href="{{ '/register' if signup_open else '/login' }}">
-      {{ 'Créer un compte' if signup_open else 'Se connecter' }}
-    </a>
+  <div class="container narrow">
+    <h2 class="section-title">Questions fréquentes</h2>
+    <div class="grid mt3">
+      <div class="card">
+        <h3 style="font-size:.95rem">Est-ce du mutualisé ou du dédié&nbsp;?</h3>
+        <p class="small muted">Ni l'un ni l'autre. Vous avez un serveur Linux complet à vous — vos fichiers,
+        votre système, vos droits root — exécuté sur une machine que je gère. C'est la souplesse d'un dédié
+        au prix d'un mutualisé.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem">Puis-je utiliser mon propre nom de domaine&nbsp;?</h3>
+        <p class="small muted">Oui. Un sous-domaine est inclus&nbsp;; vous pouvez aussi pointer votre domaine
+        ou enregistrer les serveurs que je vous indique. Le certificat HTTPS est géré automatiquement.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem">Y a-t-il un engagement&nbsp;?</h3>
+        <p class="small muted">Non. Le paiement est mensuel et vous pouvez partir quand vous voulez&nbsp;:
+        vous emportez vos données, elles vous appartiennent.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem">Où sont hébergés les serveurs&nbsp;?</h3>
+        <p class="small muted">Sur du matériel que j'exploite moi-même, en France. Pas de sous-traitance
+        à un grand cloud&nbsp;: vous savez où sont vos données.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container narrow">
+    <div class="card">
+      <h2 class="section-title" style="font-size:1.15rem">Le panneau derrière ce service est open source</h2>
+      <p class="small muted mb2">
+        Ce service tourne sur <strong>Orion</strong>, un panneau d'hébergement que je développe et
+        maintiens en public. Il décrit la machine qu'il administre, en déduit les offres qu'elle peut
+        porter, et crée les serveurs correspondants. Le code est sous licence MIT&nbsp;: lisez-le,
+        installez-le, critiquez-le.
+      </p>
+      <div class="row tight">
+        <a class="btn" href="https://github.com/paulschk/orion" target="_blank" rel="noopener">Code source (MIT)</a>
+        <a class="btn btn-ghost" href="/login">Espace client</a>
+      </div>
+    </div>
   </div>
 </section>
 
