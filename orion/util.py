@@ -72,14 +72,15 @@ def human_bytes(num: int | float) -> str:
 
 
 def money(cents: int, currency: str = "EUR") -> str:
-    """French formatting: comma decimal separator, symbol after the amount.
+    """French formatting for EUR, conventional formatting otherwise.
 
-    Producing "3,00 EUR" rather than "EUR3.00" matters here - these prices are
-    read by French customers on a French site.
+    French convention is a comma decimal separator with the symbol after the
+    amount. That must not leak into other currencies: USD is "$5.00", not
+    "$5,00".
     """
-    amount = f"{cents / 100:.2f}".replace(".", ",")
     code = (currency or "EUR").upper()
+    value = cents / 100
     if code == "EUR":
-        return f"{amount}\u00a0\u20ac"          # 3,00 € (non-breaking space)
+        return f"{value:.2f}".replace(".", ",") + "\u00a0\u20ac"   # 3,00 €
     symbol = SYMBOLS.get(code, code)
-    return f"{symbol}{amount}"
+    return f"{symbol}{value:.2f}"
