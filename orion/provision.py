@@ -371,10 +371,14 @@ cat > "$THEME/index.php" <<'ORION_THEME_INDEX'
  p{color:#9ca3af}
  code{background:#111827;border:1px solid #1f2937;padding:.15rem .4rem;border-radius:4px}
  a{color:#3b82f6}
+ .btn{display:inline-block;margin:.4rem 0 1rem;padding:.6rem 1.1rem;background:#3b82f6;
+      color:#fff;font-weight:600;text-decoration:none;border-radius:8px}
+ .btn:hover{background:#2563eb}
 </style></head><body><div class="c">
 <h1>@@BRAND@@<span class="n">Hosting</span></h1>
-<p>Votre site WordPress est en ligne. Rendez-vous dans <code>/wp-admin/</code> pour le
-composer, puis activez le theme de votre choix : cette page disparaitra d'elle-meme.</p>
+<p>Votre site WordPress est en ligne. Connectez-vous pour le composer, puis activez le
+theme de votre choix : cette page disparaitra d'elle-meme.</p>
+<p><a class="btn" href="<?php echo esc_url(wp_login_url()); ?>">Se connecter a WordPress</a></p>
 <p>Panneau d'hebergement : <a href="@@BASE_URL@@">@@BASE_URL@@</a></p>
 </div></body></html>
 ORION_THEME_INDEX

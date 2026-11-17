@@ -197,17 +197,30 @@
   });
 
   // A terminal is made of whole rows, so a pane of an arbitrary height always
-  // leaves a strip of empty background under the last line. Ask the fit addon
-  // what it would use, apply it, then set the pane to exactly that height.
-  const PADDING = 16;                       // 8px top and bottom, from the sheet
+  // leaves a strip of empty background under the last line. It is snapped to a
+  // whole number of rows - computed from a *fixed* target and the measured
+  // chrome, never from the pane's current height. Reading the height you are
+  // about to write turns this into a loop that takes a row off on every pass:
+  // the pane ends up 2px short (the borders), the next measurement no longer
+  // fits the last row, and the terminal folds itself away a line at a time.
+  const TARGET_HEIGHT = 460;
   function fitToWholeRows() {
-    const proposal = fit.proposeDimensions && fit.proposeDimensions();
-    if (!proposal || !proposal.rows) { fit.fit(); return; }
-    term.resize(proposal.cols, proposal.rows);
     const screen = pane.querySelector('.xterm-screen');
     if (!screen) return;
-    const cell = screen.getBoundingClientRect().height / term.rows;
-    if (cell > 0) pane.style.height = Math.round(proposal.rows * cell + PADDING) + 'px';
+    const style = getComputedStyle(pane);
+    const chrome = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
+      .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
+
+    const cell = term.rows > 0 ? screen.getBoundingClientRect().height / term.rows : 0;
+    if (!cell) { fit.fit(); return; }
+
+    const proposal = fit.proposeDimensions && fit.proposeDimensions();
+    const cols = (proposal && proposal.cols) || term.cols;
+    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - chrome) / cell));
+
+    if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+    const wanted = Math.round(rows * cell + chrome) + 'px';
+    if (pane.style.height !== wanted) pane.style.height = wanted;
   }
 
   term.onData(function (data) {
@@ -233,6 +246,12 @@
     attempt = 0;
     connect();
   });
+
+  // The cell height is a property of the font: measuring it before the webfont
+  // has loaded sizes the pane for the fallback and leaves it wrong afterwards.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(fitToWholeRows).catch(function () {});
+  }
 
   fitToWholeRows();
   connect();
