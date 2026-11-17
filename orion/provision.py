@@ -561,18 +561,23 @@ def provision(job_id: int, instance_id: int) -> str:
         if rc != 0:
             emit("!! sshd is not active after provisioning")
 
-        # Publish the website route *before* declaring the instance up, so
-        # "running" always means "reachable" - otherwise a client that reacts to
-        # the status change gets a 404 from the router for a few seconds.
+        # Order matters, and both wrong orders produce a wrong answer:
+        #   route after "running" -> Caddy 404s for a few seconds
+        #   route before "running" -> Caddy publishes a 503 page for an instance
+        #                             it still sees as provisioning
+        # So: register the route, mark the instance up, then publish the table -
+        # the config Caddy receives already sees a running instance.
         if tpl.web:
             domain = sites.default_domain(instance["slug"])
             sites.add_site(instance_id, domain, tpl.port)
-            emit(f"== Website route created: {domain} -> {ip}:{tpl.port}")
-            ok, message = sites.sync_caddy()
-            emit(f"== Caddy routing {'applied' if ok else 'FAILED: ' + message}")
 
         db.execute("UPDATE instances SET status = 'running', error = '', updated_at = ? WHERE id = ?",
                    (now(), instance_id))
+
+        if tpl.web:
+            emit(f"== Website route created: {domain} -> {ip}:{tpl.port}")
+            ok, message = sites.sync_caddy()
+            emit(f"== Caddy routing {'applied' if ok else 'FAILED: ' + message}")
 
         emit("== Done. The instance is online.")
         activity.log("instance.provisioned", user_id=instance["user_id"], target=name,
