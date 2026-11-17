@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime data (never commit: SQLite DB, secrets, generated Caddy config)
+docker/data/
+docker/.env
+# Generated at runtime by the panel; seeded from caddy/bootstrap.json
+docker/caddy/caddy.json
+docker/caddy/autosave.json
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
+.DS_Store

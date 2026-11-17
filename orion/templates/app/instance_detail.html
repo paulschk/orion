@@ -1,0 +1,224 @@
+{% extends "base_app.html" %}
+{% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
+{% block title %}{{ instance['name'] }}{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb"><a href="/app/instances">Mes instances</a> · {{ instance['slug'] }}</span>{% endblock %}
+{% block heading %}{{ instance['name'] }}{% endblock %}
+
+{% block actions %}
+  <a class="btn btn-sm" href="#console">Console</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="grid cols-2" style="align-items:start">
+
+  <div class="card">
+    <div class="card-h"><h2>État</h2><span class="sub mono">{{ instance['slug'] }}.{{ domain }}</span></div>
+    <div id="instance-status"
+         hx-get="/api/instances/{{ instance['id'] }}/partial"
+         hx-trigger="{{ 'every 4s' if instance['status'] == 'provisioning' else 'every 20s' }}"
+         hx-swap="innerHTML">
+      {% include "partials/instance_status.html" %}
+    </div>
+
+    <div class="row tight mt3">
+      <form method="post" action="/app/instances/{{ instance['id'] }}/power" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="start">
+        <button class="btn btn-sm" {{ 'disabled' if instance['status'] == 'running' }}>Démarrer</button>
+      </form>
+      <form method="post" action="/app/instances/{{ instance['id'] }}/power" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="restart">
+        <button class="btn btn-sm" {{ 'disabled' if instance['status'] != 'running' }}>Redémarrer</button>
+      </form>
+      <form method="post" action="/app/instances/{{ instance['id'] }}/power" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="stop">
+        <button class="btn btn-sm btn-danger" {{ 'disabled' if instance['status'] != 'running' }}>Arrêter</button>
+      </form>
+    </div>
+
+    <dl class="kv mt3">
+      <dt>Offre</dt><dd>{{ instance['plan_name'] or '—' }}</dd>
+      <dt>Modèle</dt><dd><span class="pill">{{ instance['template'] }}</span></dd>
+      <dt>Adresse interne</dt><dd class="mono">{{ instance['container_ip'] or '—' }}</dd>
+      <dt>Créée le</dt><dd>{{ instance['created_at'][:10] }}</dd>
+      <dt>Renouvellement</dt><dd>{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h2>Accès SSH</h2><span class="sub">Depuis votre réseau</span></div>
+    {% if instance['ssh_port'] %}
+      <div class="stack">
+        <div>
+          <div class="tiny dim">Commande de connexion</div>
+          <div class="codebox">{{ ssh_command }}<button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
+                data-copy="{{ ssh_command }}">Copier</button></div>
+        </div>
+        <dl class="kv">
+          <dt>Hôte</dt><dd class="mono">{{ ssh_host }}</dd>
+          <dt>Port</dt><dd class="mono">{{ instance['ssh_port'] }}</dd>
+          <dt>Utilisateur</dt><dd class="mono">{{ instance['ssh_user'] }}</dd>
+        </dl>
+      </div>
+      {% if not user['ssh_public_key'] and instance['initial_password'] %}
+        <div class="alert info mt2">
+          <div class="spread">
+            <span class="small">Aucune clé SSH enregistrée — mot de passe temporaire :</span>
+            <button class="btn btn-sm" data-reveal="#sshpass" data-value="{{ instance['initial_password'] }}">Afficher</button>
+          </div>
+          <div class="codebox mt2" id="sshpass">••••••••••••••••••••</div>
+          <div class="tiny dim mt1">Changez-le dès la première connexion, ou ajoutez une clé SSH dans <a href="/app/compte">votre compte</a>.</div>
+        </div>
+      {% endif %}
+      <p class="tiny dim mt2">
+        L'accès SSH est joignable depuis le réseau local et le tailnet uniquement.
+      </p>
+    {% else %}
+      <p class="small dim">Le port SSH sera attribué à la fin du provisionnement.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if instance['template'] == 'wordpress' and wp_creds %}
+<div class="card">
+  <div class="card-h"><h2>WordPress</h2><span class="sub">Généré à l'installation</span></div>
+  <div class="spread">
+    <div class="small">Identifiants administrateur : <span class="mono">admin</span> / mot de passe ci-contre</div>
+    <button class="btn btn-sm" data-reveal="#wppass" data-value="{{ wp_creds.splitlines()[0] }}">Afficher</button>
+  </div>
+  <div class="codebox mt2" id="wppass">••••••••••••••••••••</div>
+  <div class="small muted mt2">
+    Mot de passe de la base de données :
+    <button class="btn btn-sm btn-ghost" data-reveal="#dbpass" data-value="{{ wp_creds.splitlines()[1] if wp_creds.splitlines()|length > 1 else '' }}">Afficher</button>
+    <span class="mono" id="dbpass">••••••••</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-h">
+    <h2>Adresses web</h2>
+    <span class="sub">{{ site_rows|length }} domaine(s)</span>
+  </div>
+  {% if site_rows %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Domaine</th><th>Upstream</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for s in site_rows %}
+        <tr>
+          <td class="mono small">{{ s['domain'] }}</td>
+          <td class="mono small">:{{ s['upstream'] }}</td>
+          <td class="num">
+            <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-ghost">Retirer</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="small dim">Aucune adresse routée. Le modèle installé n'expose peut-être pas encore de serveur web.</p>
+  {% endif %}
+
+  <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt3">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="domain">Nom de domaine ou sous-domaine</label>
+        <input class="input" id="domain" name="domain" placeholder="vitrine.{{ domain }}" required>
+        <span class="hint">Le sous-domaine est créé immédiatement ; un domaine externe doit pointer vers l'hôte.</span>
+      </div>
+      <div class="field">
+        <label for="upstream">Port local servi</label>
+        <input class="input" id="upstream" name="upstream" value="80" inputmode="numeric">
+      </div>
+    </div>
+    <button class="btn">Router ce domaine</button>
+  </form>
+</div>
+
+<div class="grid cols-2" style="align-items:start">
+  <div class="card">
+    <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
+    {% if snapshots %}
+    <div class="stack">
+      {% for snap in snapshots %}
+      <div class="spread" style="padding:8px 0;border-bottom:1px solid var(--border-soft)">
+        <div>
+          <div class="mono small">{{ snap['name'] }}</div>
+          <div class="tiny dim">{{ snap['created_at'][:19].replace('T', ' ') }}</div>
+        </div>
+        <div class="row tight">
+          <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/restore" class="inline-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="btn btn-sm">Restaurer</button>
+          </form>
+          <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots/{{ snap['name'] }}/delete" class="inline-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="btn btn-sm btn-ghost">×</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <p class="small dim">Aucun instantané. Prenez-en un avant toute mise à jour risquée.</p>
+    {% endif %}
+    <form method="post" action="/app/instances/{{ instance['id'] }}/snapshots" class="mt3">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row tight">
+        <input class="input grow" name="label" placeholder="avant-maj-nginx">
+        <button class="btn">Créer un instantané</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" id="console">
+    <div class="card-h"><h2>Console</h2><span class="sub">Commande exécutée en root, dans votre instance</span></div>
+    <form hx-post="/app/instances/{{ instance['id'] }}/console"
+          hx-target="#console-out" hx-swap="innerHTML">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row tight">
+        <input class="input grow mono" name="command" placeholder="systemctl status nginx"
+               autocomplete="off" {{ 'disabled' if instance['status'] != 'running' }}>
+        <button class="btn" {{ 'disabled' if instance['status'] != 'running' }}>Exécuter</button>
+      </div>
+    </form>
+    <div id="console-out" class="mt2">
+      <div class="terminal dim">En attente d'une commande…</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h">
+    <h2>Journal de provisionnement</h2>
+    <span class="sub">{{ job['status'] if job else '—' }}</span>
+  </div>
+  {% if job and job['log'] %}
+    <div class="terminal">{{ job['log'] }}</div>
+  {% else %}
+    <p class="small dim">Aucun journal disponible.</p>
+  {% endif %}
+</div>
+
+<div class="card" style="border-color:#5a2a2a">
+  <div class="card-h"><h2>Zone sensible</h2></div>
+  <p class="small muted mb2">
+    La destruction supprime le conteneur, ses données et ses instantanés. L'opération est irréversible.
+  </p>
+  <form method="post" action="/app/instances/{{ instance['id'] }}/destroy"
+        data-confirm-slug="{{ instance['slug'] }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row tight">
+      <input class="input grow" name="confirm" placeholder="Saisissez {{ instance['slug'] }} pour confirmer">
+      <button class="btn btn-danger">Détruire l'instance</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

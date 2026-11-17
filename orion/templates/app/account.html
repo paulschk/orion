@@ -1,0 +1,62 @@
+{% extends "base_app.html" %}
+{% block title %}Mon compte{% endblock %}
+{% block heading %}Mon compte{% endblock %}
+{% block actions %}{% endblock %}
+{% block content_class %}narrow{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>Profil</h2><span class="sub mono">{{ user['email'] }}</span></div>
+  <form method="post" action="/app/compte">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="name">Nom</label>
+        <input class="input" id="name" name="name" value="{{ user['name'] or '' }}">
+      </div>
+      <div class="field">
+        <label for="company">Société</label>
+        <input class="input" id="company" name="company" value="{{ user['company'] or '' }}">
+      </div>
+    </div>
+    <div class="field">
+      <label for="ssh_public_key">Clé SSH publique</label>
+      <textarea class="input" id="ssh_public_key" name="ssh_public_key"
+                placeholder="ssh-ed25519 AAAAC3Nza… vous@machine">{{ user['ssh_public_key'] or '' }}</textarea>
+      <span class="hint">
+        Injectée dans les nouvelles instances. Sur une instance existante, ajoutez-la manuellement
+        dans <span class="mono">~/.ssh/authorized_keys</span>.
+      </span>
+    </div>
+    <button class="btn btn-primary">Enregistrer</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Mot de passe</h2></div>
+  <form method="post" action="/app/compte/password">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="current_password">Mot de passe actuel</label>
+        <input class="input" type="password" id="current_password" name="current_password" required>
+      </div>
+      <div class="field">
+        <label for="new_password">Nouveau mot de passe</label>
+        <input class="input" type="password" id="new_password" name="new_password" minlength="10" required>
+        <span class="hint">10 caractères minimum.</span>
+      </div>
+    </div>
+    <button class="btn">Changer le mot de passe</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Session</h2></div>
+  <dl class="kv">
+    <dt>Compte créé le</dt><dd>{{ user['user_created_at'][:10] }}</dd>
+    <dt>Rôle</dt><dd>{{ 'administrateur' if user['role'] == 'admin' else 'client' }}</dd>
+  </dl>
+  <a class="btn btn-danger mt3" href="/logout">Se déconnecter</a>
+</div>
+{% endblock %}

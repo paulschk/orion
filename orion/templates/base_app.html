@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ app_name }}{% endblock %} — {{ brand }}</title>
+<link rel="stylesheet" href="/static/css/orion.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230f0b07'/><text x='16' y='23' font-size='19' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%23f97316'>o</text></svg>">
+<script src="/static/js/htmx.min.js" defer></script>
+<script src="/static/js/orion.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <a href="/" class="logo">{{ brand }}<span class="num">Hosting</span></a>
+      <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
+    </div>
+
+    {% if user['role'] == 'admin' %}
+      <div class="nav-label">Exploitation</div>
+      <a class="nav {{ 'active' if path == '/admin' }}" href="/admin">Vue d'ensemble</a>
+      <a class="nav {{ 'active' if path.startswith('/admin/instances') }}" href="/admin/instances">Instances <span class="count">{{ nav_instances }}</span></a>
+      <a class="nav {{ 'active' if path.startswith('/admin/clients') }}" href="/admin/clients">Clients <span class="count">{{ nav_clients }}</span></a>
+      <a class="nav {{ 'active' if path.startswith('/admin/sites') }}" href="/admin/sites">Routage web <span class="count">{{ nav_sites }}</span></a>
+      <div class="nav-label">Commercial</div>
+      <a class="nav {{ 'active' if path.startswith('/admin/plans') }}" href="/admin/plans">Offres</a>
+      <a class="nav {{ 'active' if path.startswith('/admin/invoices') }}" href="/admin/invoices">Factures</a>
+      <div class="nav-label">Système</div>
+      <a class="nav {{ 'active' if path.startswith('/admin/activity') }}" href="/admin/activity">Journal</a>
+      <a class="nav {{ 'active' if path.startswith('/admin/settings') }}" href="/admin/settings">Réglages</a>
+    {% endif %}
+
+    <div class="nav-label">{{ 'Mon espace' if user['role'] != 'admin' else 'Espace client' }}</div>
+    <a class="nav {{ 'active' if path == '/app' }}" href="/app">Tableau de bord</a>
+    <a class="nav {{ 'active' if path.startswith('/app/instances') }}" href="/app/instances">Mes instances</a>
+    <a class="nav" href="/app/instances/new">Nouvelle instance</a>
+    <a class="nav {{ 'active' if path.startswith('/app/factures') }}" href="/app/factures">Factures</a>
+    <a class="nav {{ 'active' if path.startswith('/app/compte') }}" href="/app/compte">Compte</a>
+
+    <div class="foot">
+      <div class="who">{{ user['email'] }}</div>
+      <a class="nav" href="/tarifs">Tarifs</a>
+      <a class="nav" href="/logout">Déconnexion</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting</span>{% endblock %}
+        <h1>{% block heading %}{{ app_name }}{% endblock %}</h1>
+      </div>
+      <div class="row tight">
+        {% block actions %}{% endblock %}
+        <a class="btn btn-primary btn-sm" href="/app/instances/new">Nouvelle instance</a>
+      </div>
+    </header>
+    <div class="content {% block content_class %}{% endblock %}">
+      {% include "partials/flash.html" %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

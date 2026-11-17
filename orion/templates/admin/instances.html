@@ -1,0 +1,37 @@
+{% extends "base_app.html" %}
+{% block title %}Instances{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">exploitation</span>{% endblock %}
+{% block heading %}Toutes les instances{% endblock %}
+{% block content_class %}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>{{ instances|length }} instance(s)</h2>
+    <span class="sub">{{ info.host_name }} · {{ info.sellable_vcpu }} vCPU vendables</span></div>
+  {% if instances %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Instance</th><th>Client</th><th>Offre</th><th>Modèle</th><th>État</th><th>IP</th><th>SSH</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for i in instances %}
+        {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
+        <tr>
+          <td><span class="mono small">{{ i['slug'] }}</span>
+              <div class="tiny dim">{{ i['incus_name'] }}</div></td>
+          <td class="small">{{ i['email'] }}</td>
+          <td class="small">{{ i['plan_name'] or '—' }}</td>
+          <td class="small"><span class="pill">{{ i['template'] }}</span></td>
+          <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
+          <td class="small mono">{{ i['container_ip'] or '—' }}</td>
+          <td class="small mono">{{ i['ssh_port'] or '—' }}</td>
+          <td class="num"><a class="btn btn-sm" href="/admin/instances/{{ i['id'] }}">Détail</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><h3>Aucune instance</h3><p class="small">Rien n'a encore été provisionné.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

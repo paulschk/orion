@@ -1,0 +1,38 @@
+{
+  "admin": {
+    "listen": "0.0.0.0:2019",
+    "enforce_origin": false
+  },
+  "logging": {
+    "logs": {
+      "default": {
+        "level": "INFO",
+        "encoder": { "format": "json" },
+        "writer": { "output": "stdout" }
+      }
+    }
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "orion": {
+          "listen": [":8080"],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "static_response",
+                  "status_code": 503,
+                  "body": "Orion tenant router has not been configured yet.",
+                  "headers": { "Content-Type": ["text/plain; charset=utf-8"] }
+                }
+              ],
+              "terminal": true
+            }
+          ],
+          "logs": {}
+        }
+      }
+    }
+  }
+}

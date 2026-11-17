@@ -1,0 +1,77 @@
+{% extends "base_public.html" %}
+{% block title %}Tarifs{% endblock %}
+{% block content %}
+<div class="container" style="padding:56px 24px 0">
+  <span class="eyebrow">Tarifs</span>
+  <h1 style="font-size:2rem;margin-bottom:12px">Le prix de l'offre, et rien d'autre.</h1>
+  <p class="muted" style="max-width:620px">
+    Pas de facturation à l'usage, pas de frais de dépassement. Chaque offre est un plafond réel,
+    appliqué par le noyau de la machine d'hébergement.
+  </p>
+</div>
+
+<section>
+  <div class="container">
+    <div class="grid cols-4">
+      {% for plan in plans %}
+      {% set features = plan['features'].splitlines() if plan['features'] else [] %}
+      <div class="card plan-card">
+        <div>
+          <h3>{{ plan['name'] }}</h3>
+          <div class="price mt1">{{ plan['price_cents']|money }}<small> / mois</small></div>
+        </div>
+        <ul>
+          {% for line in features %}<li>{{ line }}</li>{% endfor %}
+          {% if not features %}
+            <li>{{ plan['vcpu'] }} vCPU</li>
+            <li>{{ plan['memory_mb']|human_mb }} de RAM</li>
+            <li>{{ plan['disk_gb'] }} GB NVMe</li>
+            <li>{{ plan['sites'] }} site{{ 's' if plan['sites'] > 1 }}</li>
+          {% endif %}
+        </ul>
+        <p class="small dim grow">{{ plan['description'] }}</p>
+        <a class="btn {{ 'btn-primary' if loop.first else '' }}"
+           href="{{ '/register' if signup_open else '/login' }}?plan={{ plan['slug'] }}">Choisir cette offre</a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card flat mt3">
+      <div class="spread">
+        <div>
+          <h3 style="font-size:.95rem">Capacité de cette machine</h3>
+          <p class="small dim">Mise à jour à chaque chargement de page, lue depuis l'hyperviseur.</p>
+        </div>
+        <div class="row">
+          <span class="badge">{{ info.sellable_vcpu }} vCPU</span>
+          <span class="badge">{{ info.sellable_ram_mb|human_mb }} RAM</span>
+          <span class="badge">{{ info.sellable_disk_gb }} GB disque</span>
+          <span class="badge idle">{{ headroom.instances }} instance{{ 's' if headroom.instances != 1 }} en service</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-2 mt3">
+      <div class="card">
+        <h3 style="font-size:.95rem">Ce qui est inclus</h3>
+        <ul class="plan-card" style="margin-top:10px">
+          <li>Accès SSH complet (clé ou mot de passe)</li>
+          <li>Console web dans le navigateur</li>
+          <li>Instantanés à la demande</li>
+          <li>Modèles LEMP, WordPress, Node.js, Docker</li>
+          <li>Nom de domaine routé automatiquement</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.95rem">Ce qui n'est pas inclus</h3>
+        <ul class="plan-card" style="margin-top:10px">
+          <li>Nom de domaine (vous apportez le vôtre)</li>
+          <li>Adresses e-mail</li>
+          <li>SLA contractuel — c'est un hébergement de proximité</li>
+          <li>Extensions propriétaires (cPanel et consorts)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

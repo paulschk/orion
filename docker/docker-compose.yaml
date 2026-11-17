@@ -1,0 +1,50 @@
+services:
+  orion:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: orion:latest
+    container_name: orion
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Panel state: SQLite database and provisioning logs.
+      - ./data:/data
+      # Same host directory the tenant Caddy mounts at /etc/caddy, so the
+      # routing table written by the panel is the one Caddy reloads on restart.
+      - ./caddy:/caddy
+      # The host Incus daemon. The panel needs the socket only - never the
+      # daemon's privileged capabilities.
+      - /var/lib/incus/unix.socket:/var/lib/incus/unix.socket
+    networks:
+      - orion
+      - gpi
+    expose:
+      - "8000"
+
+  # Dedicated Caddy for *tenant* websites. The public edge Caddy terminates TLS
+  # for *.hosting.node29.fr and proxies here; Orion writes this instance's
+  # routing table over Caddy's admin API (http://orion-caddy:2019/load).
+  orion-caddy:
+    image: caddy:2-alpine
+    container_name: orion-caddy
+    restart: unless-stopped
+    # No --adapter: JSON *is* Caddy's native config format, and passing
+    # "--adapter json" makes Caddy fail with "unrecognized config adapter".
+    command: ["caddy", "run", "--config", "/etc/caddy/caddy.json"]
+    volumes:
+      - ./caddy:/etc/caddy
+    networks:
+      - orion
+      # Same network as the edge Caddy, so it can reverse_proxy to
+      # orion-caddy:8080 by name without touching the edge stack.
+      - gpi
+
+networks:
+  orion:
+    name: orion
+  # Shared network the edge Caddy already joins, so it can reach orion:8000
+  # and orion-caddy:8080 by name.
+  gpi:
+    external: true

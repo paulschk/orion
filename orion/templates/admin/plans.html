@@ -1,0 +1,76 @@
+{% extends "base_app.html" %}
+{% block title %}Offres{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">commercial</span>{% endblock %}
+{% block heading %}Offres{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>Offres</h2>
+    <span class="sub">capacité restante calculée depuis les ressources de l'hôte</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Offre</th><th class="num">vCPU</th><th class="num">RAM</th><th class="num">Disque</th><th class="num">Sites</th><th class="num">Prix</th><th class="num">Reste</th><th></th></tr></thead>
+      <tbody>
+        {% for plan in plans %}
+        <tr>
+          <td><span class="small">{{ plan['name'] }}</span>
+              <div class="tiny dim mono">{{ plan['slug'] }}{% if not plan['is_active'] %} · inactive{% endif %}</div></td>
+          <td class="num">{{ plan['vcpu'] }}</td>
+          <td class="num">{{ plan['memory_mb'] }}</td>
+          <td class="num">{{ plan['disk_gb'] }}</td>
+          <td class="num">{{ plan['sites'] }}</td>
+          <td class="num">{{ plan['price_cents']|money }}</td>
+          <td class="num"><span class="badge {{ 'ok' if capacities[plan['id']] else 'bad' }}">{{ capacities[plan['id']] }}</span></td>
+          <td class="num">
+            <button class="btn btn-sm" type="button"
+              onclick="document.getElementById('plan-{{ plan['id'] }}').scrollIntoView({behavior:'smooth'})">Modifier</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% for plan in plans %}
+<div class="card" id="plan-{{ plan['id'] }}">
+  <div class="card-h"><h2>{{ plan['name'] }}</h2><span class="sub mono">{{ plan['slug'] }}</span></div>
+  <form method="post" action="/admin/plans">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="plan_id" value="{{ plan['id'] }}">
+    <div class="form-grid">
+      <div class="field"><label>Nom</label><input class="input" name="name" value="{{ plan['name'] }}" required></div>
+      <div class="field"><label>Prix mensuel (centimes)</label>
+        <input class="input" name="price_cents" value="{{ plan['price_cents'] }}" inputmode="numeric"></div>
+      <div class="field"><label>vCPU</label><input class="input" name="vcpu" value="{{ plan['vcpu'] }}" inputmode="numeric"></div>
+      <div class="field"><label>RAM (MB)</label><input class="input" name="memory_mb" value="{{ plan['memory_mb'] }}" inputmode="numeric"></div>
+      <div class="field"><label>Disque (GB)</label><input class="input" name="disk_gb" value="{{ plan['disk_gb'] }}" inputmode="numeric"></div>
+      <div class="field"><label>Sites inclus</label><input class="input" name="sites" value="{{ plan['sites'] }}" inputmode="numeric"></div>
+      <div class="field"><label>Ordre d'affichage</label><input class="input" name="sort_order" value="{{ plan['sort_order'] }}" inputmode="numeric"></div>
+      <div class="field"><label>Description</label><input class="input" name="description" value="{{ plan['description'] }}"></div>
+    </div>
+    <label class="checkline mb2"><input type="checkbox" name="is_active" {{ 'checked' if plan['is_active'] }}> Offre proposée</label>
+    <button class="btn btn-primary btn-sm">Enregistrer</button>
+    <span class="tiny dim" style="margin-left:10px">Un changement de plan n'affecte pas les instances déjà créées.</span>
+  </form>
+</div>
+{% endfor %}
+
+<div class="card">
+  <div class="card-h"><h2>Nouvelle offre</h2></div>
+  <form method="post" action="/admin/plans">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <div class="field"><label>Identifiant</label><input class="input" name="slug" placeholder="mini" required></div>
+      <div class="field"><label>Nom</label><input class="input" name="name" placeholder="Mini" required></div>
+      <div class="field"><label>Prix mensuel (centimes)</label><input class="input" name="price_cents" value="200" inputmode="numeric"></div>
+      <div class="field"><label>vCPU</label><input class="input" name="vcpu" value="1" inputmode="numeric"></div>
+      <div class="field"><label>RAM (MB)</label><input class="input" name="memory_mb" value="512" inputmode="numeric"></div>
+      <div class="field"><label>Disque (GB)</label><input class="input" name="disk_gb" value="5" inputmode="numeric"></div>
+      <div class="field"><label>Sites inclus</label><input class="input" name="sites" value="1" inputmode="numeric"></div>
+      <div class="field"><label>Description</label><input class="input" name="description"></div>
+    </div>
+    <button class="btn btn-primary">Créer l'offre</button>
+  </form>
+</div>
+{% endblock %}

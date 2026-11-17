@@ -1,0 +1,285 @@
+"""SQLite access layer.
+
+Deliberately plain: sqlite3 from the standard library, a small helper surface,
+and one schema string. Orion runs on one host with one writer, so this is well
+inside SQLite's comfort zone and keeps the deployment dependency-free.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import sqlite3
+from collections.abc import Mapping
+from typing import Any, Iterable
+
+from .config import settings
+from .util import now, rand_password
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    email           TEXT    NOT NULL UNIQUE,
+    password_hash   TEXT    NOT NULL,
+    name            TEXT    NOT NULL DEFAULT '',
+    company         TEXT    NOT NULL DEFAULT '',
+    role            TEXT    NOT NULL DEFAULT 'client',
+    is_active       INTEGER NOT NULL DEFAULT 1,
+    ssh_public_key  TEXT    NOT NULL DEFAULT '',
+    created_at      TEXT    NOT NULL,
+    last_login_at   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS plans (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug         TEXT    NOT NULL UNIQUE,
+    name         TEXT    NOT NULL,
+    vcpu         INTEGER NOT NULL,
+    memory_mb    INTEGER NOT NULL,
+    disk_gb      INTEGER NOT NULL,
+    price_cents  INTEGER NOT NULL,
+    currency     TEXT    NOT NULL DEFAULT 'EUR',
+    period_days  INTEGER NOT NULL DEFAULT 30,
+    sites        INTEGER NOT NULL DEFAULT 1,
+    description  TEXT    NOT NULL DEFAULT '',
+    features     TEXT    NOT NULL DEFAULT '',
+    is_active    INTEGER NOT NULL DEFAULT 1,
+    sort_order   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS instances (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL REFERENCES users(id),
+    plan_id          INTEGER REFERENCES plans(id),
+    name             TEXT    NOT NULL,
+    slug             TEXT    NOT NULL,
+    incus_name       TEXT    NOT NULL UNIQUE,
+    template         TEXT    NOT NULL DEFAULT 'bare',
+    status           TEXT    NOT NULL DEFAULT 'provisioning',
+    container_ip     TEXT    NOT NULL DEFAULT '',
+    ssh_port         INTEGER,
+    ssh_user         TEXT    NOT NULL DEFAULT 'orion',
+    initial_password TEXT    NOT NULL DEFAULT '',
+    provision_log    TEXT    NOT NULL DEFAULT '',
+    error            TEXT    NOT NULL DEFAULT '',
+    created_at       TEXT    NOT NULL,
+    updated_at       TEXT,
+    expires_at       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_instances_user ON instances(user_id);
+
+CREATE TABLE IF NOT EXISTS sites (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    instance_id  INTEGER NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    domain       TEXT    NOT NULL UNIQUE,
+    upstream     INTEGER NOT NULL DEFAULT 80,
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    created_at   TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    plan_id      INTEGER NOT NULL,
+    instance_id  INTEGER,
+    status       TEXT    NOT NULL DEFAULT 'active',
+    started_at   TEXT    NOT NULL,
+    renews_at    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    number          TEXT    NOT NULL UNIQUE,
+    user_id         INTEGER NOT NULL,
+    subscription_id INTEGER,
+    amount_cents    INTEGER NOT NULL,
+    currency        TEXT    NOT NULL DEFAULT 'EUR',
+    status          TEXT    NOT NULL DEFAULT 'sent',
+    description     TEXT    NOT NULL DEFAULT '',
+    issued_at       TEXT    NOT NULL,
+    due_at          TEXT,
+    paid_at         TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id          TEXT    PRIMARY KEY,
+    user_id     INTEGER NOT NULL,
+    csrf        TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL,
+    expires_at  TEXT    NOT NULL,
+    ip          TEXT    NOT NULL DEFAULT '',
+    user_agent  TEXT    NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS activity (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER,
+    action     TEXT    NOT NULL,
+    target     TEXT    NOT NULL DEFAULT '',
+    detail     TEXT    NOT NULL DEFAULT '',
+    ip         TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT    NOT NULL,
+    instance_id INTEGER,
+    status      TEXT    NOT NULL DEFAULT 'queued',
+    log         TEXT    NOT NULL DEFAULT '',
+    created_at  TEXT    NOT NULL,
+    finished_at TEXT
+);
+"""
+
+SEED_PLANS = [
+    dict(slug="starter", name="Starter", vcpu=1, memory_mb=512, disk_gb=5,
+         price_cents=300, sites=1, sort_order=10,
+         description="Une petite vitrine, un blog, un projet perso.",
+         features=["1 vCPU", "512 MB RAM", "5 GB NVMe", "1 site web",
+                   "SSH + console web", "Sauvegardes \u00e0 la demande"]),
+    dict(slug="standard", name="Standard", vcpu=1, memory_mb=1024, disk_gb=10,
+         price_cents=600, sites=3, sort_order=20,
+         description="Le tier le plus courant : WordPress et sites dynamiques.",
+         features=["1 vCPU", "1 GB RAM", "10 GB NVMe", "3 sites web",
+                   "SSH + console web", "Sauvegardes \u00e0 la demande"]),
+    dict(slug="pro", name="Pro", vcpu=2, memory_mb=2048, disk_gb=25,
+         price_cents=1200, sites=10, sort_order=30,
+         description="Applications, bases de donn\u00e9es, trafic r\u00e9gulier.",
+         features=["2 vCPU", "2 GB RAM", "25 GB NVMe", "10 sites web",
+                   "SSH + console web", "Sauvegardes planifi\u00e9es"]),
+    dict(slug="business", name="Business", vcpu=4, memory_mb=4096, disk_gb=50,
+         price_cents=2400, sites=25, sort_order=40,
+         description="Charge soutenue, plusieurs applications, staging.",
+         features=["4 vCPU", "4 GB RAM", "50 GB NVMe", "25 sites web",
+                   "SSH + console web", "Sauvegardes planifi\u00e9es"]),
+]
+
+SETTING_DEFAULTS = {
+    "host_fingerprint": "",
+    "host_name": "",
+    "host_first_seen": "",
+    "signup_open": "1",
+    "provider_name": "node29",
+}
+
+
+def connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(settings.db_path), timeout=30.0, isolation_level=None)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=15000")
+    return conn
+
+
+@contextlib.contextmanager
+def cursor(commit: bool = False):
+    conn = connect()
+    try:
+        cur = conn.cursor()
+        yield cur
+        if commit:
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def bind(params: Any) -> Any:
+    """sqlite3 wants a tuple for positional params and a dict for named ones."""
+    if params is None:
+        return ()
+    if isinstance(params, Mapping):
+        return dict(params)
+    if isinstance(params, (tuple, list)):
+        return tuple(params)
+    return (params,)
+
+
+def query(sql: str, params: Any = ()) -> list[sqlite3.Row]:
+    with cursor() as cur:
+        return cur.execute(sql, bind(params)).fetchall()
+
+
+def one(sql: str, params: Any = ()) -> sqlite3.Row | None:
+    with cursor() as cur:
+        return cur.execute(sql, bind(params)).fetchone()
+
+
+def scalar(sql: str, params: Iterable[Any] = (), default: Any = None) -> Any:
+    row = one(sql, params)
+    if row is None:
+        return default
+    value = row[0]
+    return default if value is None else value
+
+
+def execute(sql: str, params: Any = ()) -> int:
+    with cursor(commit=True) as cur:
+        cur.execute(sql, bind(params))
+        return cur.lastrowid or 0
+
+
+def expand(sql: str, params: Any = ()) -> list[sqlite3.Row]:
+    """Alias kept for readability at call sites that read many rows."""
+    return query(sql, params)
+
+
+def get_setting(key: str, default: str = "") -> str:
+    row = one("SELECT value FROM settings WHERE key = ?", (key,))
+    if row is None:
+        return SETTING_DEFAULTS.get(key, default)
+    return row["value"]
+
+
+def set_setting(key: str, value: str) -> None:
+    execute(
+        "INSERT INTO settings(key, value) VALUES(?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+
+
+def init() -> None:
+    """Create the schema and seed the first run. Idempotent."""
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.jobs_dir.mkdir(parents=True, exist_ok=True)
+    settings.caddy_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with cursor(commit=True) as cur:
+        cur.executescript(SCHEMA)
+
+    for key, value in SETTING_DEFAULTS.items():
+        if one("SELECT 1 FROM settings WHERE key = ?", (key,)) is None:
+            execute("INSERT INTO settings(key, value) VALUES(?, ?)", (key, value))
+
+    for seed in SEED_PLANS:
+        if one("SELECT 1 FROM plans WHERE slug = ?", (seed["slug"],)) is None:
+            plan = {k: v for k, v in seed.items() if k != "features"}
+            execute(
+                "INSERT INTO plans(slug, name, vcpu, memory_mb, disk_gb, price_cents, "
+                "currency, period_days, sites, description, features, is_active, sort_order) "
+                "VALUES(:slug, :name, :vcpu, :memory_mb, :disk_gb, :price_cents, "
+                ":currency, 30, :sites, :description, :features, 1, :sort_order)",
+                {**plan, "currency": settings.currency,
+                 "features": "\n".join(seed["features"])},
+            )
+
+    from .security import hash_password  # local import: avoids a cycle
+
+    if one("SELECT 1 FROM users WHERE role = 'admin'") is None:
+        password = settings.admin_password or rand_password(16)
+        execute(
+            "INSERT INTO users(email, password_hash, name, role, is_active, created_at) "
+            "VALUES(?, ?, 'Administrator', 'admin', 1, ?)",
+            (settings.admin_email, hash_password(password), now()),
+        )
+        if not settings.admin_password:
+            print(f"[orion] admin account created: {settings.admin_email} / {password}")

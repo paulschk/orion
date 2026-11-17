@@ -1,0 +1,31 @@
+{% extends "base_app.html" %}
+{% block title %}Journal{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">système</span>{% endblock %}
+{% block heading %}Journal d'activité{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>300 derniers événements</h2><span class="sub">authentification, provisions, facturation</span></div>
+  {% if activity %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Horodatage</th><th>Action</th><th>Cible</th><th>Détail</th><th>Compte</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for e in activity %}
+        <tr>
+          <td class="small dim nowrap">{{ e['created_at'][:19].replace('T',' ') }}</td>
+          <td class="small nowrap"><span class="pill">{{ e['action'] }}</span></td>
+          <td class="small mono">{{ e['target'] or '—' }}</td>
+          <td class="small dim">{{ e['detail'][:120] }}</td>
+          <td class="small">{{ e['email'] or 'système' }}</td>
+          <td class="small dim mono">{{ e['ip'] or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="small dim">Aucun événement.</p>
+  {% endif %}
+</div>
+{% endblock %}

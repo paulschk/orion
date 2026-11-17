@@ -1,0 +1,112 @@
+{% extends "base_app.html" %}
+{% block title %}{{ client['email'] }}{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb"><a href="/admin/clients">Clients</a> · {{ client['email'] }}</span>{% endblock %}
+{% block heading %}{{ client['name'] or client['email'] }}{% endblock %}
+
+{% block content %}
+<div class="grid cols-2" style="align-items:start">
+  <div class="card">
+    <div class="card-h"><h2>Compte</h2>
+      {% if client['is_active'] %}<span class="badge ok">actif</span>{% else %}<span class="badge bad">suspendu</span>{% endif %}</div>
+    <form method="post" action="/admin/clients/{{ client['id'] }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label>Adresse e-mail</label>
+        <input class="input" value="{{ client['email'] }}" disabled></div>
+      <div class="form-grid">
+        <div class="field"><label for="name">Nom</label>
+          <input class="input" id="name" name="name" value="{{ client['name'] or '' }}"></div>
+        <div class="field"><label for="company">Société</label>
+          <input class="input" id="company" name="company" value="{{ client['company'] or '' }}"></div>
+      </div>
+      <div class="field"><label for="role">Rôle</label>
+        <select class="input" id="role" name="role">
+          <option value="client" {{ 'selected' if client['role'] == 'client' }}>Client</option>
+          <option value="admin" {{ 'selected' if client['role'] == 'admin' }}>Administrateur</option>
+        </select></div>
+      <label class="checkline mb2">
+        <input type="checkbox" name="is_active" {{ 'checked' if client['is_active'] }}> Compte actif
+      </label>
+      <button class="btn btn-primary">Enregistrer</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h2>Réinitialiser le mot de passe</h2></div>
+    <form method="post" action="/admin/clients/{{ client['id'] }}/password">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label for="password">Nouveau mot de passe</label>
+        <input class="input" id="password" name="password" placeholder="généré automatiquement"></div>
+      <button class="btn">Réinitialiser</button>
+    </form>
+    <dl class="kv mt3">
+      <dt>Créé</dt><dd>{{ client['created_at'][:10] }}</dd>
+      <dt>Dernière connexion</dt><dd>{{ client['last_login_at'][:19].replace('T',' ') if client['last_login_at'] else 'jamais' }}</dd>
+      <dt>Clé SSH</dt><dd class="mono tiny">{{ (client['ssh_public_key'][:48] + '…') if client['ssh_public_key'] else 'aucune' }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Instances</h2><span class="sub">{{ instances|length }}</span></div>
+  {% if instances %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Nom</th><th>Offre</th><th>Modèle</th><th>État</th><th>IP</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for i in instances %}
+        {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
+        <tr>
+          <td class="mono small">{{ i['slug'] }}</td>
+          <td class="small">{{ i['plan_name'] or '—' }}</td>
+          <td class="small"><span class="pill">{{ i['template'] }}</span></td>
+          <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
+          <td class="small mono">{{ i['container_ip'] or '—' }}</td>
+          <td class="num"><a class="btn btn-sm" href="/admin/instances/{{ i['id'] }}">Détail</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="small dim">Ce client n'a pas encore d'instance.</p>{% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Factures</h2></div>
+  {% if invoices %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Numéro</th><th>Objet</th><th class="num">Montant</th><th>État</th></tr></thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td class="mono small">{{ inv['number'] }}</td>
+          <td class="small">{{ inv['description'] }}</td>
+          <td class="num">{{ inv['amount_cents']|money }}</td>
+          <td>{% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
+              {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
+              {% else %}<span class="badge warn">à régler</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="small dim">Aucune facture.</p>{% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Activité du compte</h2></div>
+  {% if activity %}
+  <div class="timeline">
+    {% for e in activity %}
+    <div class="item">
+      <span class="when">{{ e['created_at'][:16].replace('T',' ') }}</span>
+      <span class="grow"><span class="what">{{ e['action'] }}</span>
+        {% if e['target'] %}<span class="dim"> · {{ e['target'] }}</span>{% endif %}
+        {% if e['detail'] %}<div class="tiny dim">{{ e['detail'][:160] }}</div>{% endif %}</span>
+      <span class="who">{{ e['ip'] or '' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<p class="small dim">Aucune activité.</p>{% endif %}
+</div>
+{% endblock %}

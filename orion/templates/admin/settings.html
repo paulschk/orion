@@ -1,0 +1,56 @@
+{% extends "base_app.html" %}
+{% block title %}Réglages{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">système</span>{% endblock %}
+{% block heading %}Réglages{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>Hôte géré</h2>
+    <span class="sub">{{ 'détecté automatiquement' if info.reachable else 'Incus injoignable' }}</span></div>
+  <dl class="kv">
+    <dt>Nom</dt><dd>{{ info.host_name }}</dd>
+    <dt>Empreinte</dt><dd class="mono tiny">{{ host_fingerprint or '—' }}</dd>
+    <dt>Premier démarrage</dt><dd>{{ host_first_seen[:19].replace('T',' ') if host_first_seen else '—' }}</dd>
+    <dt>Système</dt><dd>{{ info.os_name }} · noyau {{ info.kernel }}</dd>
+    <dt>Incus</dt><dd>{{ info.incus_version }} (pare-feu {{ info.firewall }})</dd>
+    <dt>Pool</dt><dd class="mono">{{ info.pool_name }} · {{ info.pool_used_gb }} / {{ info.pool_total_gb }} GB</dd>
+    <dt>Capacité vendable</dt><dd>{{ info.sellable_vcpu }} vCPU · {{ info.sellable_ram_mb|human_mb }} · {{ info.sellable_disk_gb }} GB</dd>
+    <dt>Réservé au système</dt><dd>{{ info.reserve_vcpu }} vCPU · {{ info.reserve_ram_mb|human_mb }} · {{ info.reserve_disk_gb }} GB</dd>
+  </dl>
+  <p class="tiny dim mt2">
+    L'empreinte est enregistrée au démarrage : si le panneau est déplacé vers une autre machine,
+    elle change et le journal le signale.
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Configuration active</h2><span class="sub">variables d'environnement</span></div>
+  <dl class="kv">
+    <dt>Domaine</dt><dd class="mono">{{ cfg.domain }}</dd>
+    <dt>URL publique</dt><dd class="mono">{{ cfg.base_url }}</dd>
+    <dt>Hôte SSH client</dt><dd class="mono">{{ cfg.ssh_host }}</dd>
+    <dt>Plage de ports SSH</dt><dd class="mono">{{ cfg.ssh_port_min }}–{{ cfg.ssh_port_max }}</dd>
+    <dt>Utilisateur SSH par défaut</dt><dd class="mono">{{ cfg.ssh_user }}</dd>
+    <dt>Image de base</dt><dd class="mono">{{ cfg.incus_image }}</dd>
+    <dt>API Caddy tenant</dt><dd class="mono">{{ cfg.caddy_admin }}</dd>
+    <dt>Facturation</dt><dd><span class="badge {{ 'warn' if cfg.billing_mode == 'mock' else 'ok' }}">{{ cfg.billing_mode }}</span></dd>
+  </dl>
+  <p class="tiny dim mt2">Ces valeurs se modifient dans <span class="mono">docker/.env</span>, puis au redémarrage du conteneur.</p>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Comportement du panneau</h2></div>
+  <form method="post" action="/admin/settings">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="checkline mb2">
+      <input type="checkbox" name="signup_open" {{ 'checked' if signup_open }}>
+      Inscriptions ouvertes au public
+    </label>
+    <label class="checkline mb2">
+      <input type="checkbox" name="resync" value="1">
+      Réappliquer la configuration de routage à l'enregistrement
+    </label>
+    <button class="btn btn-primary">Enregistrer</button>
+  </form>
+</div>
+{% endblock %}

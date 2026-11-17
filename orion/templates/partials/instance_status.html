@@ -1,0 +1,18 @@
+{% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
+<div class="row">
+  <span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span>
+  {% if live_status and live_status != instance['status'] %}<span class="badge idle">Incus : {{ live_status }}</span>{% endif %}
+  {% if instance['container_ip'] %}<span class="tiny dim mono">{{ instance['container_ip'] }}</span>{% endif %}
+</div>
+{% if instance['status'] == 'provisioning' %}
+  <p class="small muted mt2">Installation en cours. Cette page se rafraîchit toute seule.</p>
+  {% if job %}<div class="bar"><span style="width:{{ 100 if job['status'] == 'done' else 62 }}%"></span></div>{% endif %}
+{% elif instance['status'] == 'error' %}
+  <p class="small mt2" style="color:var(--bad)">{{ instance['error'] }}</p>
+{% elif metrics %}
+  <dl class="kv mt2">
+    <dt>Mémoire</dt><dd class="mono">{{ metrics['memory_used']|human_bytes }}{% if memory_cap %} / {{ memory_cap }}{% endif %}</dd>
+    <dt>Processus</dt><dd class="mono">{{ metrics['processes'] }}</dd>
+    <dt>CPU cumulé</dt><dd class="mono">{{ (metrics['cpu_ns'] / 1000000000)|round(1) }} s</dd>
+  </dl>
+{% endif %}

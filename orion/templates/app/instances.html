@@ -1,0 +1,42 @@
+{% extends "base_app.html" %}
+{% block title %}Mes instances{% endblock %}
+{% block heading %}Mes instances{% endblock %}
+{% block actions %}{% endblock %}
+
+{% block content %}
+<div class="card">
+  {% if instances %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Nom</th><th>Offre</th><th>Modèle</th><th>État</th><th>IP</th><th>SSH</th><th>Créée</th><th class="num"></th></tr>
+      </thead>
+      <tbody>
+        {% for i in instances %}
+        {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
+        <tr>
+          <td>
+            <a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
+            <div class="tiny dim mono">{{ i['slug'] }}</div>
+          </td>
+          <td class="small">{{ i['plan_name'] or '—' }}</td>
+          <td class="small"><span class="pill">{{ i['template'] }}</span></td>
+          <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
+          <td class="small mono">{{ i['container_ip'] or '—' }}</td>
+          <td class="small mono">{{ i['ssh_port'] or '—' }}</td>
+          <td class="small dim">{{ i['created_at'][:10] }}</td>
+          <td class="num"><a class="btn btn-sm" href="/app/instances/{{ i['id'] }}">Gérer</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Aucune instance</h3>
+    <p class="small">Votre espace est vide. Créez un premier serveur pour commencer.</p>
+    <a class="btn btn-primary mt2" href="/app/instances/new">Créer une instance</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base_app.html" %}
+{% block title %}Routage web{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">exploitation</span>{% endblock %}
+{% block heading %}Routage web{% endblock %}
+{% block actions %}
+  <form method="post" action="/admin/sites/sync" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn btn-sm">Resynchroniser</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>Proxy tenant</h2>
+    {% if caddy_ok %}<span class="badge ok"><span class="dot"></span>en ligne</span>
+    {% else %}<span class="badge bad"><span class="dot"></span>injoignable</span>{% endif %}</div>
+  <p class="small muted">
+    Chaque domaine ci-dessous est poussé vers l'API d'administration de Caddy en une seule
+    configuration atomique. Le proxy tenant ne termine pas TLS : le Caddy de bord s'en charge
+    en amont pour <span class="mono">*.{{ domain }}</span>.
+  </p>
+  {% if not caddy_ok %}<div class="alert err mt2 mono small">{{ caddy_detail }}</div>{% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>{{ sites|length }} domaine(s) routé(s)</h2>
+    <span class="sub">{{ domain }}</span></div>
+  {% if sites %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Domaine</th><th>Instance</th><th>Client</th><th>Upstream</th><th>Cible</th><th>État</th></tr></thead>
+      <tbody>
+        {% for s in sites %}
+        <tr>
+          <td class="mono small">{{ s['domain'] }}</td>
+          <td class="mono small">{{ s['instance_slug'] }}</td>
+          <td class="small dim">{{ s['container_ip'] or '—' }}</td>
+          <td class="small mono">:{{ s['upstream'] }}</td>
+          <td class="small mono">{{ s['container_ip'] or '—' }}</td>
+          <td>
+            {% if not s['enabled'] %}<span class="badge muted">désactivé</span>
+            {% elif s['instance_status'] == 'running' and s['container_ip'] %}<span class="badge ok">actif</span>
+            {% else %}<span class="badge warn">503</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><h3>Aucun domaine</h3>
+    <p class="small">Les domaines apparaissent dès qu'une instance exposant un site web est créée.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

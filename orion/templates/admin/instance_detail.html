@@ -1,0 +1,97 @@
+{% extends "base_app.html" %}
+{% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
+{% block title %}{{ instance['slug'] }}{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb"><a href="/admin/instances">Instances</a> · {{ instance['incus_name'] }}</span>{% endblock %}
+{% block heading %}{{ instance['slug'] }}{% endblock %}
+
+{% block content %}
+<div class="grid cols-2" style="align-items:start">
+  <div class="card">
+    <div class="card-h"><h2>État</h2>
+      <span class="sub">{{ instance['email'] }}</span></div>
+    <div id="instance-status"
+         hx-get="/api/instances/{{ instance['id'] }}/partial"
+         hx-trigger="{{ 'every 4s' if instance['status'] == 'provisioning' else 'every 20s' }}"
+         hx-swap="innerHTML">
+      {% include "partials/instance_status.html" %}
+    </div>
+    <div class="row tight mt3">
+      {% for action, label, danger in [('start','Démarrer',0), ('restart','Redémarrer',0), ('stop','Arrêter',1)] %}
+      <form method="post" action="/admin/instances/{{ instance['id'] }}/power" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ action }}">
+        <button class="btn btn-sm {{ 'btn-danger' if danger }}">{{ label }}</button>
+      </form>
+      {% endfor %}
+      <form method="post" action="/admin/instances/{{ instance['id'] }}/repair" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-sm">Réparer</button>
+      </form>
+    </div>
+    <dl class="kv mt3">
+      <dt>Conteneur</dt><dd class="mono">{{ instance['incus_name'] }}</dd>
+      <dt>Offre</dt><dd>{{ instance['plan_name'] or '—' }}</dd>
+      <dt>Modèle</dt><dd><span class="pill">{{ instance['template'] }}</span></dd>
+      <dt>Adresse</dt><dd class="mono">{{ instance['container_ip'] or '—' }}</dd>
+      <dt>SSH</dt><dd class="mono">{{ ssh_command or '—' }}</dd>
+      <dt>Créée</dt><dd>{{ instance['created_at'][:19].replace('T',' ') }}</dd>
+      <dt>Expire</dt><dd>{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h2>Adresses web</h2><span class="sub">{{ site_rows|length }}</span></div>
+    {% if site_rows %}
+    <div class="stack">
+      {% for s in site_rows %}
+      <div class="spread" style="padding:6px 0;border-bottom:1px solid var(--border-soft)">
+        <span class="mono small">{{ s['domain'] }}</span>
+        <span class="tiny dim mono">:{{ s['upstream'] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="small dim">Aucune route.</p>{% endif %}
+
+    <div class="card-h mt3"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
+    {% if snapshots %}
+    <div class="stack">
+      {% for snap in snapshots %}
+      <div class="spread" style="padding:5px 0">
+        <span class="mono small">{{ snap['name'] }}</span>
+        <span class="tiny dim">{{ snap['created_at'][:16].replace('T',' ') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="small dim">Aucun instantané.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Console root</h2><span class="sub">accès administrateur, journalisé</span></div>
+  <form hx-post="/app/instances/{{ instance['id'] }}/console" hx-target="#console-out" hx-swap="innerHTML">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row tight">
+      <input class="input grow mono" name="command" placeholder="df -h" autocomplete="off"
+             {{ 'disabled' if instance['status'] != 'running' }}>
+      <button class="btn" {{ 'disabled' if instance['status'] != 'running' }}>Exécuter</button>
+    </div>
+  </form>
+  <div id="console-out" class="mt2"><div class="terminal dim">En attente…</div></div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Journal de provisionnement</h2><span class="sub">{{ job['status'] if job else '—' }}</span></div>
+  {% if job and job['log'] %}<div class="terminal">{{ job['log'] }}</div>
+  {% else %}<p class="small dim">Aucun journal.</p>{% endif %}
+</div>
+
+<div class="card" style="border-color:#5a2a2a">
+  <div class="card-h"><h2>Destruction</h2></div>
+  <form method="post" action="/admin/instances/{{ instance['id'] }}/destroy" data-confirm-slug="{{ instance['slug'] }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row tight">
+      <input class="input grow" name="confirm" placeholder="Saisissez {{ instance['slug'] }}">
+      <button class="btn btn-danger">Détruire</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

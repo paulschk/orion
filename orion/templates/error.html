@@ -1,0 +1,14 @@
+{% extends "base_public.html" %}
+{% block title %}Erreur {{ code }}{% endblock %}
+{% block content %}
+<div class="container narrow" style="padding:80px 24px">
+  <div class="card">
+    <h1 style="font-size:1.3rem;margin-bottom:8px">Erreur {{ code }}</h1>
+    <p class="muted">{{ message }}</p>
+    <div class="row mt3">
+      <a class="btn" href="/">Retour à l'accueil</a>
+      {% if user %}<a class="btn btn-primary" href="/app">Mon tableau de bord</a>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

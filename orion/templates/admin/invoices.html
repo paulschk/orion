@@ -1,0 +1,52 @@
+{% extends "base_app.html" %}
+{% block title %}Factures{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">commercial</span>{% endblock %}
+{% block heading %}Factures{% endblock %}
+
+{% block content %}
+<div class="stat-grid" style="max-width:460px">
+  <div class="stat {{ 'warn' if outstanding }}"><div class="k">Encours total</div><div class="v">{{ outstanding|money }}</div></div>
+  <div class="stat"><div class="k">Factures</div><div class="v">{{ invoices|length }}</div></div>
+</div>
+
+{% if billing_mode == 'mock' %}
+<div class="alert info">
+  Facturation simulée (ORION_BILLING_MODE=mock). Le point d'intégration Stripe est décrit dans
+  <span class="mono">docs/BILLING.md</span> ; marquer une facture payée ici ne déclenche aucun encaissement.
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Numéro</th><th>Client</th><th>Objet</th><th>Émise</th><th class="num">Montant</th><th>État</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td class="mono small">{{ inv['number'] }}</td>
+          <td class="small">{{ inv['email'] }}</td>
+          <td class="small">{{ inv['description'] }}</td>
+          <td class="small dim">{{ inv['issued_at'][:10] }}</td>
+          <td class="num">{{ inv['amount_cents']|money }}</td>
+          <td>{% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
+              {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
+              {% else %}<span class="badge warn">à régler</span>{% endif %}</td>
+          <td class="num nowrap">
+            {% if inv['status'] != 'paid' and inv['status'] != 'void' %}
+            <form method="post" action="/admin/invoices/{{ inv['id'] }}/paid" class="inline-form">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-primary">Marquer payée</button>
+            </form>
+            <form method="post" action="/admin/invoices/{{ inv['id'] }}/void" class="inline-form">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-ghost">Annuler</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

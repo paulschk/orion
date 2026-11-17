@@ -1,0 +1,131 @@
+{% extends "base_public.html" %}
+{% block title %}Hébergement de petits serveurs virtuels{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <div class="container">
+    <span class="eyebrow">Auto-hébergé · {{ info.host_name }}</span>
+    <h1>Un vrai serveur pour votre site, à partir de {{ plans[0]['price_cents']|money if plans else '3,00 €' }} par mois.</h1>
+    <p class="lead">
+      Des instances Linux complètes — SSH, systemd, quotas réels — hébergées sur une seule
+      machine chez {{ brand }}, pas dans un cloud facturé au dépassement.
+    </p>
+    <div class="row">
+      <a class="btn btn-primary" href="{{ '/register' if signup_open else '/tarifs' }}">Créer mon instance</a>
+      <a class="btn" href="/tarifs">Voir les tarifs</a>
+    </div>
+    <p class="small dim mt3">
+      {{ info.sellable_vcpu }} vCPU et {{ info.sellable_ram_mb|human_mb }} de RAM sont disponibles
+      sur cette machine · {{ info.incus_version and 'Incus ' ~ info.incus_version }}
+    </p>
+  </div>
+</div>
+
+<section>
+  <div class="container">
+    <h2 class="section-title">Ce que vous obtenez</h2>
+    <p class="section-lead">Le confort d'un hébergement classique, sans la boîte noire.</p>
+    <div class="grid cols-3">
+      <div class="card feature">
+        <h3>Une vraie machine</h3>
+        <p>Conteneur système Incus : vous êtes root, systemd fonctionne, <code>apt</code> fonctionne.
+           Ce n'est pas un espace web limité.</p>
+      </div>
+      <div class="card feature">
+        <h3>SSH et console web</h3>
+        <p>Clé SSH ou mot de passe, au choix. Et un terminal dans le navigateur pour les
+           dépannages rapides.</p>
+      </div>
+      <div class="card feature">
+        <h3>Des quotas honnêtes</h3>
+        <p>CPU, mémoire et disque sont réellement plafonnés au niveau du noyau.
+           Vous ne subissez pas les voisins.</p>
+      </div>
+      <div class="card feature">
+        <h3>Sauvegardes instantanées</h3>
+        <p>Un instantané avant chaque mise à jour risquée, restauration en un clic.</p>
+      </div>
+      <div class="card feature">
+        <h3>Modèles prêts à l'emploi</h3>
+        <p>Serveur nu, LEMP, WordPress, Node.js ou Docker. Ou installez ce que vous voulez.</p>
+      </div>
+      <div class="card feature">
+        <h3>Prix plat</h3>
+        <p>Pas de facturation à l'usage, pas de surprise. Le prix de l'offre, rien d'autre.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="container">
+    <div class="spread">
+      <div>
+        <h2 class="section-title">Comment ça marche</h2>
+        <p class="section-lead" style="margin-bottom:0">De la commande à la ligne SSH en trois étapes.</p>
+      </div>
+    </div>
+    <div class="grid cols-3 mt3">
+      <div class="card">
+        <span class="pill">1</span>
+        <h3 class="mt2">Choisissez une offre</h3>
+        <p class="muted small">vCPU, mémoire et disque déduits de ce que la machine peut réellement porter.</p>
+      </div>
+      <div class="card">
+        <span class="pill">2</span>
+        <h3 class="mt2">Choisissez un modèle</h3>
+        <p class="muted small">Serveur nu, ou site prêt à l'emploi. Le panneau installe le reste.</p>
+      </div>
+      <div class="card">
+        <span class="pill">3</span>
+        <h3 class="mt2">Connectez-vous</h3>
+        <p class="muted small">Une adresse, un port, une clé. Votre instance est en ligne sous une minute.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if plans %}
+<section>
+  <div class="container">
+    <h2 class="section-title">Les offres</h2>
+    <p class="section-lead">Prix mensuel, sans engagement. Capacité restante affichée en direct.</p>
+    <div class="grid cols-4">
+      {% for plan in plans %}
+      <div class="card plan-card">
+        <div>
+          <h3>{{ plan['name'] }}</h3>
+          <div class="price mt1">{{ plan['price_cents']|money }}<small> / mois</small></div>
+        </div>
+        <ul>
+          <li>{{ plan['vcpu'] }} vCPU</li>
+          <li>{{ plan['memory_mb']|human_mb }} de RAM</li>
+          <li>{{ plan['disk_gb'] }} GB NVMe</li>
+          <li>{{ plan['sites'] }} site{{ 's' if plan['sites'] > 1 }}</li>
+        </ul>
+        <p class="small dim">{{ plan['description'] }}</p>
+        <a class="btn {{ 'btn-primary' if loop.first else '' }}" href="{{ '/register' if signup_open else '/login' }}?plan={{ plan['slug'] }}">Choisir</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="alt">
+  <div class="container narrow center">
+    <h2 class="section-title">Prêt à essayer ?</h2>
+    <p class="section-lead" style="margin:0 auto 24px">
+      {% if signup_open %}
+        Créez un compte, le panneau détecte la machine et provisionne votre instance.
+      {% else %}
+        Les inscriptions sont actuellement fermées. Écrivez-nous pour un accès.
+      {% endif %}
+    </p>
+    <a class="btn btn-primary" href="{{ '/register' if signup_open else '/login' }}">
+      {{ 'Créer un compte' if signup_open else 'Se connecter' }}
+    </a>
+  </div>
+</section>
+
+{% endblock %}

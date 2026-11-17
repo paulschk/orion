@@ -1,0 +1,4 @@
+{% if command %}<div class="small dim mb1">$ {{ command }}</div>{% endif %}
+{% if error %}<div class="terminal"><span class="err">{{ error }}</span></div>
+{% elif output %}<div class="terminal">{{ output }}</div>
+{% else %}<div class="terminal dim">(aucune sortie)</div>{% endif %}

@@ -1,0 +1,52 @@
+{% extends "base_app.html" %}
+{% block title %}Clients{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">exploitation</span>{% endblock %}
+{% block heading %}Clients{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-h"><h2>{{ clients|length }} compte(s)</h2><span class="sub">clients et administrateurs</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Compte</th><th>Nom</th><th>Rôle</th><th class="num">Instances</th><th class="num">Encours</th><th>État</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for c in clients %}
+        <tr>
+          <td><span class="small">{{ c['email'] }}</span>
+              <div class="tiny dim">créé le {{ c['created_at'][:10] }}</div></td>
+          <td class="small">{{ c['name'] or '—' }}{% if c['company'] %}<div class="tiny dim">{{ c['company'] }}</div>{% endif %}</td>
+          <td>{% if c['role'] == 'admin' %}<span class="badge">admin</span>{% else %}<span class="badge idle">client</span>{% endif %}</td>
+          <td class="num">{{ c['instance_count'] }}</td>
+          <td class="num">{% if c['due_cents'] %}<span style="color:var(--warn)">{{ c['due_cents']|money }}</span>{% else %}<span class="dim">—</span>{% endif %}</td>
+          <td>{% if c['is_active'] %}<span class="badge ok">actif</span>{% else %}<span class="badge bad">suspendu</span>{% endif %}</td>
+          <td class="num"><a class="btn btn-sm" href="/admin/clients/{{ c['id'] }}">Ouvrir</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Créer un compte</h2><span class="sub">mot de passe généré si laissé vide</span></div>
+  <form method="post" action="/admin/clients">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="form-grid">
+      <div class="field"><label for="email">Adresse e-mail</label>
+        <input class="input" type="email" id="email" name="email" required></div>
+      <div class="field"><label for="name">Nom</label>
+        <input class="input" id="name" name="name"></div>
+      <div class="field"><label for="company">Société</label>
+        <input class="input" id="company" name="company"></div>
+      <div class="field"><label for="password">Mot de passe initial</label>
+        <input class="input" id="password" name="password" placeholder="généré automatiquement"></div>
+      <div class="field"><label for="role">Rôle</label>
+        <select class="input" id="role" name="role">
+          <option value="client">Client</option>
+          <option value="admin">Administrateur</option>
+        </select></div>
+    </div>
+    <button class="btn btn-primary">Créer le compte</button>
+  </form>
+</div>
+{% endblock %}

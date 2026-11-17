@@ -1,0 +1,56 @@
+{% extends "base_app.html" %}
+{% block title %}Factures{% endblock %}
+{% block heading %}Factures{% endblock %}
+{% block actions %}{% endblock %}
+
+{% block content %}
+<div class="stat-grid" style="max-width:520px">
+  <div class="stat {{ 'warn' if total_due }}">
+    <div class="k">Reste à payer</div>
+    <div class="v">{{ total_due|money }}</div>
+  </div>
+  <div class="stat">
+    <div class="k">Factures</div>
+    <div class="v">{{ invoices|length }}</div>
+  </div>
+</div>
+
+{% if billing_mode == 'mock' %}
+<div class="alert info">
+  Le paiement est simulé sur cette instance de démonstration : aucune somme n'est prélevée.
+  Les factures servent de trace comptable.
+</div>
+{% endif %}
+
+<div class="card">
+  {% if invoices %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Numéro</th><th>Objet</th><th>Instance</th><th>Émise</th><th class="num">Montant</th><th>État</th></tr></thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td class="mono small">{{ inv['number'] }}</td>
+          <td class="small">{{ inv['description'] }}</td>
+          <td class="small mono">{{ inv['instance_slug'] or '—' }}</td>
+          <td class="small dim">{{ inv['issued_at'][:10] }}</td>
+          <td class="num">{{ inv['amount_cents']|money }}</td>
+          <td>
+            {% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
+            {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
+            {% elif inv['status'] == 'draft' %}<span class="badge idle">brouillon</span>
+            {% else %}<span class="badge warn">à régler</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Aucune facture</h3>
+    <p class="small">Les factures apparaissent dès la création d'une instance.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

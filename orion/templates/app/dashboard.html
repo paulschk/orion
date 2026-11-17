@@ -1,0 +1,117 @@
+{% extends "base_app.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting · espace client</span>{% endblock %}
+{% block heading %}Tableau de bord{% endblock %}
+{% block actions %}{% endblock %}
+
+{% block content %}
+
+<div class="stat-grid">
+  <div class="stat accent">
+    <div class="k">Instances</div>
+    <div class="v">{{ instances|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="k">vCPU alloués</div>
+    <div class="v">{{ allocation.vcpu }}<small> / {{ info.sellable_vcpu }}</small></div>
+  </div>
+  <div class="stat">
+    <div class="k">RAM allouée</div>
+    <div class="v">{{ allocation.ram_mb|human_mb }}<small> / {{ info.sellable_ram_mb|human_mb }}</small></div>
+  </div>
+  <div class="stat {{ 'warn' if headroom.disk_gb < 10 }}">
+    <div class="k">Disque disponible</div>
+    <div class="v">{{ headroom.disk_gb }}<small> GB</small></div>
+  </div>
+</div>
+
+{% if running_jobs %}
+<div class="alert info">{{ running_jobs }} tâche(s) en cours d'exécution sur l'hôte.</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-h">
+    <h2>Mes instances</h2>
+    <a class="small" href="/app/instances">Tout voir</a>
+  </div>
+  {% if instances %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nom</th><th>Offre</th><th>Modèle</th><th>État</th><th>Adresse</th><th class="num">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in instances %}
+        {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
+        <tr>
+          <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
+              <div class="tiny dim mono">{{ i['slug'] }}.{{ domain }}</div></td>
+          <td class="small">{{ i['plan_name'] or '—' }}</td>
+          <td class="small"><span class="pill">{{ i['template'] }}</span></td>
+          <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
+          <td class="small mono">{{ i['container_ip'] or '—' }}</td>
+          <td class="num"><a class="btn btn-sm" href="/app/instances/{{ i['id'] }}">Gérer</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <h3>Aucune instance</h3>
+    <p class="small">Provisionnez votre premier serveur : il sera en ligne en moins d'une minute.</p>
+    <a class="btn btn-primary mt2" href="/app/instances/new">Créer une instance</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <div class="card-h">
+      <h2>Modèles disponibles</h2>
+      <a class="small" href="/app/instances/new">En créer une</a>
+    </div>
+    <div class="stack">
+      {% for tpl in templates %}
+      <div class="spread" style="padding:7px 0;border-bottom:1px solid var(--border-soft)">
+        <div>
+          <div style="font-weight:600;font-size:.9rem">{{ tpl.label }}</div>
+          <div class="tiny dim">{{ tpl.tagline }}</div>
+        </div>
+        {% if tpl.web %}<span class="badge idle">site web</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">
+      <h2>Dernières factures</h2>
+      <a class="small" href="/app/factures">Toutes</a>
+    </div>
+    {% if invoices %}
+      <div class="stack">
+        {% for inv in invoices %}
+        <div class="spread" style="padding:7px 0;border-bottom:1px solid var(--border-soft)">
+          <div>
+            <div class="mono" style="font-size:.85rem">{{ inv['number'] }}</div>
+            <div class="tiny dim">{{ inv['issued_at'][:10] }} · {{ inv['plan_name'] or inv['description'][:28] }}</div>
+          </div>
+          <div class="row tight">
+            <span class="small">{{ inv['amount_cents']|money }}</span>
+            {% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
+            {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
+            {% else %}<span class="badge warn">à régler</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="small dim">Aucune facture pour l'instant.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

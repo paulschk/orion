@@ -1,0 +1,84 @@
+{% extends "base_app.html" %}
+{% block title %}Nouvelle instance{% endblock %}
+{% block heading %}Nouvelle instance{% endblock %}
+{% block actions %}{% endblock %}
+{% block content_class %}narrow{% endblock %}
+
+{% block content %}
+<form method="post" action="/app/instances">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="card">
+    <div class="card-h">
+      <h2>1. Offre</h2>
+      <span class="sub">Capacité disponible sur {{ info.host_name }} : {{ headroom.vcpu }} vCPU, {{ headroom.ram_mb|human_mb }} RAM, {{ headroom.disk_gb }} GB</span>
+    </div>
+    <div class="field">
+      <label for="plan_id">Offre mensuelle</label>
+      <select class="input" id="plan_id" name="plan_id" data-plan-picker="#plan-summary" required>
+        {% for plan in plans %}
+        <option value="{{ plan['id'] }}" data-summary="{{ plan['vcpu'] }} vCPU · {{ plan['memory_mb']|human_mb }} · {{ plan['disk_gb'] }} GB · {{ plan['price_cents']|money }}/mois"
+          {{ 'selected' if plan['slug'] == preselect_plan }} {{ 'disabled' if plan['is_active'] != 1 }}>
+          {{ plan['name'] }} — {{ plan['price_cents']|money }}/mois
+        </option>
+        {% endfor %}
+      </select>
+      <span class="hint" id="plan-summary"></span>
+    </div>
+    <p class="tiny dim">
+      Billing en mode {{ billing_mode }} : l'instance est provisionnée immédiatement et une facture
+      est enregistrée. Aucun paiement réel n'est demandé.
+    </p>
+  </div>
+
+  <div class="card mt3">
+    <div class="card-h"><h2>2. Modèle</h2><span class="sub">Ce qui sera installé au premier démarrage</span></div>
+    <div class="tpl-pick">
+      {% for item in templates %}
+      {% set tpl = item.tpl %}
+      <label class="tpl {{ 'sel' if tpl.slug == preselect_template }}">
+        <input type="radio" name="template" value="{{ tpl.slug }}"
+               {{ 'checked' if tpl.slug == preselect_template }}>
+        <div class="t">{{ tpl.label }}</div>
+        <div class="d">{{ tpl.tagline }}</div>
+        {% if tpl.min_memory_mb %}
+          <div class="tiny dim mt1">≥ {{ tpl.min_memory_mb|human_mb }} de RAM</div>
+        {% endif %}
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card mt3">
+    <div class="card-h"><h2>3. Identification</h2></div>
+    <div class="field">
+      <label for="name">Nom de l'instance</label>
+      <input class="input" id="name" name="name" placeholder="vitrine, blog, api-interne…" required>
+      <span class="hint">Sert de nom d'hôte et d'adresse : <span class="mono">nom.{{ domain }}</span></span>
+    </div>
+    <div class="field">
+      <label for="ssh_public_key">Clé SSH publique <span class="dim">(recommandé)</span></label>
+      <textarea class="input" id="ssh_public_key" name="ssh_public_key"
+                placeholder="ssh-ed25519 AAAAC3Nza… vous@machine">{{ user['ssh_public_key'] or '' }}</textarea>
+      <span class="hint">
+        Sans clé, un mot de passe root temporaire est généré et affiché sur la page de l'instance.
+        Il est préférable de renseigner une clé.
+      </span>
+    </div>
+    <label class="checkline">
+      <input type="checkbox" name="use_saved_key" value="1" checked>
+      Mémoriser cette clé sur mon profil
+    </label>
+  </div>
+
+  <div class="card mt3">
+    <div class="spread">
+      <div>
+        <h2 style="font-size:1rem">Prêt à provisionner</h2>
+        <p class="small dim">Le conteneur est créé, limité, et le modèle installé. Environ une minute.</p>
+      </div>
+      <button class="btn btn-primary" type="submit">Créer l'instance</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
