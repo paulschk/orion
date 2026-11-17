@@ -24,6 +24,12 @@
       {% if s['caution'] and not site %}
       <div class="tiny" style="color:var(--warn)">À n'exposer qu'en connaissance de cause.</div>
       {% endif %}
+      {% if not s['web'] and not site %}
+      <div class="tiny dim">
+        Ce routage ne transporte que HTTP et HTTPS. Un service à protocole propre —
+        un serveur de jeu, une base de données, du SSH — n'y passera pas, même publié.
+      </div>
+      {% endif %}
     </div>
     <div class="row tight">
       {% if site %}

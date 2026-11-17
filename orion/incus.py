@@ -31,6 +31,26 @@ class IncusError(RuntimeError):
         return self.stderr or self.stdout or str(self)
 
 
+# Interfaces that belong to something *inside* the instance: Docker's own
+# bridge, Kubernetes, libvirt, a VPN client. A Docker instance reports docker0
+# alongside its own eth0, and the daemon serialises that map with sorted keys -
+# so docker0 is read first and wins, handing back an address the host cannot
+# reach. Publishing it would send the tenant router to a dead end.
+INTERNAL_IFACES = ("lo", "docker", "br-", "veth", "virbr", "cni", "lxcbr", "tailscale")
+
+
+def pick_primary_address(state: dict) -> str:
+    """The instance's own global IPv4 address, out of a /state payload."""
+    network = state.get("network") or {}
+    names = [n for n in network if n != "lo" and not n.startswith(INTERNAL_IFACES)]
+    names.sort(key=lambda n: (n != "eth0", n))          # eth0 first, then A-Z
+    for net_name in names:
+        for addr in (network.get(net_name) or {}).get("addresses", []):
+            if addr.get("family") == "inet" and addr.get("scope") == "global":
+                return addr.get("address", "")
+    return ""
+
+
 class Incus:
     def __init__(self, cfg=settings):
         self.cfg = cfg
@@ -158,21 +178,14 @@ class Incus:
         return self.query(f"/1.0/instances/{name}") or {}
 
     def primary_ip(self, name: str) -> str:
-        """First global IPv4 address of a running instance.
+        """The instance's own IPv4 address.
 
         The plain instance record carries no runtime state at all - network
         information only exists on the /state endpoint. Reading it from
         `config()` silently returns nothing, which looks exactly like a
         container that failed to get an address.
         """
-        state = self.query(f"/1.0/instances/{name}/state") or {}
-        for net_name, net in (state.get("network") or {}).items():
-            if net_name == "lo":
-                continue
-            for addr in net.get("addresses", []):
-                if addr.get("family") == "inet" and addr.get("scope") == "global":
-                    return addr.get("address", "")
-        return ""
+        return pick_primary_address(self.query(f"/1.0/instances/{name}/state") or {})
 
     def create(self, name: str, *, vcpu: int, memory_mb: int, disk_gb: int,
                image: str | None = None, timeout: int = 600) -> None:
