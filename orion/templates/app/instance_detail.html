@@ -13,7 +13,7 @@
 
 {% block content %}
 
-<div class="grid cols-2" style="align-items:start">
+<div class="grid cols-2">
 
   <div class="card">
     <div class="card-h"><h2>État</h2><span class="sub mono">{{ instance['slug'] }}.{{ domain }}</span></div>
@@ -88,6 +88,22 @@
       <p class="small dim">Le port SSH sera attribué à la fin du provisionnement.</p>
     {% endif %}
   </div>
+</div>
+
+{# Directly under the access details: the shell and the portal are the two ways
+   in, so they sit together rather than at opposite ends of the page. #}
+<div class="card">
+  <div class="card-h">
+    <h2>Terminal</h2>
+    <span class="sub" id="terminal-status"></span>
+  </div>
+  <div id="terminal" class="term-pane"
+       data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
+       data-state="{{ instance['status'] }}"></div>
+  <p class="tiny dim mt2">
+    Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
+    fonctionnent. Chaque ouverture de session est journalisée.
+  </p>
 </div>
 
 {% if instance['template'] == 'wordpress' and wp_creds %}
@@ -275,22 +291,7 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-h">
-    <h2>Terminal</h2>
-    <span class="sub" id="terminal-status"></span>
-  </div>
-  <div id="terminal" class="term-pane"
-       data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
-       data-state="{{ instance['status'] }}"></div>
-  <p class="tiny dim mt2">
-    Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
-    fonctionnent. Chaque ouverture de session est journalisée.
-  </p>
-</div>
-
-{# Directly below the terminal: a snapshot is what you take before running
-   something in there. #}
+{# A snapshot is what you take before running something you might regret. #}
 <div class="card">
   <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
   {% if snapshots %}
