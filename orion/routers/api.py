@@ -79,8 +79,13 @@ async def instance_partial(request: Request, instance_id: int):
     job = db.one("SELECT * FROM jobs WHERE instance_id = ? ORDER BY id DESC LIMIT 1", (instance_id,))
     instance = db.one("SELECT * FROM instances WHERE id = ?", (instance_id,))
     plan = db.one("SELECT memory_mb FROM plans WHERE id = ?", (instance["plan_id"],)) if instance["plan_id"] else None
+    steps = []
+    if job and job["log"]:
+        steps = [l[3:].strip() for l in job["log"].splitlines()
+                 if l.startswith("== ") and l[3:].strip()]
     return render(request, "partials/instance_status.html", session=session,
                   instance=instance, metrics=metrics, live_status=live_status, job=job,
+                  steps=steps,
                   memory_cap=(f"{plan['memory_mb']} MB" if plan else ""))
 
 

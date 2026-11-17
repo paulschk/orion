@@ -57,16 +57,19 @@ def all_sites() -> list:
         "FROM sites s JOIN instances i ON i.id = s.instance_id ORDER BY s.domain")
 
 
-def add_site(instance_id: int, domain: str, upstream: int = 80) -> int:
+def add_site(instance_id: int, domain: str, upstream: int = 80, *, primary: bool = False) -> int:
     domain = domain.strip().lower()
     existing = db.one("SELECT * FROM sites WHERE domain = ?", (domain,))
     if existing:
-        db.execute("UPDATE sites SET instance_id = ?, upstream = ?, enabled = 1 WHERE id = ?",
-                   (instance_id, upstream, existing["id"]))
+        db.execute("UPDATE sites SET instance_id = ?, upstream = ?, enabled = 1, "
+                   "is_primary = ? WHERE id = ?",
+                   (instance_id, upstream, 1 if primary else existing["is_primary"],
+                    existing["id"]))
         return existing["id"]
     return db.execute(
-        "INSERT INTO sites(instance_id, domain, upstream, enabled, created_at) VALUES(?, ?, ?, 1, ?)",
-        (instance_id, domain, upstream, now()))
+        "INSERT INTO sites(instance_id, domain, upstream, enabled, is_primary, created_at) "
+        "VALUES(?, ?, ?, 1, ?, ?)",
+        (instance_id, domain, upstream, 1 if primary else 0, now()))
 
 
 def remove_site(site_id: int) -> None:

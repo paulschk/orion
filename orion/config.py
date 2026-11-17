@@ -55,6 +55,7 @@ class Settings:
     caddy_admin: str
     caddy_config: str
     tenant_listen: str
+    ingress_ip: str
 
     # Capacity (held back from sale)
     reserve_vcpu: int
@@ -110,6 +111,7 @@ def load() -> Settings:
         caddy_admin=_s("ORION_CADDY_ADMIN", "http://orion-caddy:2019").rstrip("/"),
         caddy_config=_s("ORION_CADDY_CONFIG", "/caddy/caddy.json"),
         tenant_listen=_s("ORION_TENANT_LISTEN", ":8080"),
+        ingress_ip=_s("ORION_INGRESS_IP", ""),
         reserve_vcpu=_i("ORION_RESERVE_VCPU", 1),
         reserve_ram_mb=_i("ORION_RESERVE_RAM_MB", 1536),
         reserve_disk_gb=_i("ORION_RESERVE_DISK_GB", 10),

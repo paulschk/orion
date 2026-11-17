@@ -109,47 +109,125 @@
 <div class="card">
   <div class="card-h">
     <h2>Adresses web</h2>
-    <span class="sub">{{ site_rows|length }} domaine(s)</span>
+    <span class="sub">{{ site_rows|length }} adresse(s)</span>
   </div>
-  {% if site_rows %}
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Domaine</th><th>Upstream</th><th class="num"></th></tr></thead>
-      <tbody>
-        {% for s in site_rows %}
-        <tr>
-          <td class="mono small">{{ s['domain'] }}</td>
-          <td class="mono small">:{{ s['upstream'] }}</td>
-          <td class="num">
-            <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button class="btn btn-sm btn-ghost">Retirer</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <p class="small dim">Aucune adresse routée. Le modèle installé n'expose peut-être pas encore de serveur web.</p>
-  {% endif %}
 
-  <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt3">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="form-grid">
-      <div class="field">
-        <label for="domain">Nom de domaine ou sous-domaine</label>
-        <input class="input" id="domain" name="domain" placeholder="vitrine.{{ domain }}" required>
-        <span class="hint">Le sous-domaine est créé immédiatement ; un domaine externe doit pointer vers l'hôte.</span>
-      </div>
-      <div class="field">
-        <label for="upstream">Port local servi</label>
-        <input class="input" id="upstream" name="upstream" value="80" inputmode="numeric">
+  <div class="mode">
+    <div class="mode-head">
+      <span class="pill">Simple</span>
+      <div>
+        <div class="mode-title">Votre adresse en {{ tenant_domain }}</div>
+        <div class="tiny dim">Elle existe dès la création, avec HTTPS. Rien à configurer.</div>
       </div>
     </div>
-    <button class="btn">Router ce domaine</button>
-  </form>
+
+    {% if default_site %}
+      <div class="codebox mt2">
+        <a href="https://{{ default_site['domain'] }}" target="_blank" rel="noopener"
+           style="text-decoration:none">{{ default_site['domain'] }}</a>
+        <button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
+                data-copy="https://{{ default_site['domain'] }}">Copier</button>
+      </div>
+      <p class="tiny dim mt1">Servie par votre instance sur le port {{ default_site['upstream'] }}.</p>
+
+      <details class="mt2">
+        <summary class="small">Changer le sous-domaine</summary>
+        <form method="post" action="/app/instances/{{ instance['id'] }}/subdomain" class="mt2">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="row tight">
+            <input class="input grow mono" name="label" aria-label="Sous-domaine"
+                   value="{{ default_site['domain'].split('.')[0] }}">
+            <span class="dim mono">.{{ tenant_domain }}</span>
+            <button class="btn btn-sm">Renommer</button>
+          </div>
+          <span class="hint">L'ancienne adresse cesse de fonctionner. Le certificat suit automatiquement.</span>
+        </form>
+      </details>
+    {% else %}
+      <p class="small muted mt2">
+        Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
+        Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
+      </p>
+      <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt2">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="domain" value="{{ instance['slug'] }}.{{ tenant_domain }}">
+        <input type="hidden" name="upstream" value="80">
+        <button class="btn btn-sm">Créer {{ instance['slug'] }}.{{ tenant_domain }}</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <details class="advanced mt3" {{ 'open' if custom_sites }}>
+    <summary>Mode avancé — utiliser un nom de domaine à vous</summary>
+    <p class="small muted mt2">
+      Déclarez votre domaine ci-dessous, puis créez chez votre registrar les enregistrements
+      suivants. Le certificat HTTPS est délivré automatiquement dès que le DNS répond.
+    </p>
+
+    <div class="table-wrap mt2">
+      <table class="table">
+        <thead><tr><th>Type</th><th>Nom</th><th>Valeur</th><th>TTL</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono small">A</td>
+            <td class="mono small">votredomaine.fr</td>
+            <td class="mono small">{{ ingress_ip or '—' }}</td>
+            <td class="mono small">300</td>
+          </tr>
+          <tr>
+            <td class="mono small">CNAME</td>
+            <td class="mono small">www.votredomaine.fr</td>
+            <td class="mono small">{{ default_domain }}</td>
+            <td class="mono small">300</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% if not ingress_ip %}
+      <p class="tiny dim mt1">
+        L'adresse d'entrée n'est pas renseignée côté serveur (<span class="mono">ORION_INGRESS_IP</span>) —
+        demandez-la à l'administrateur.
+      </p>
+    {% endif %}
+
+    <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt3">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="form-grid">
+        <div class="field">
+          <label for="domain">Nom de domaine</label>
+          <input class="input" id="domain" name="domain" placeholder="www.mondomaine.fr" required>
+          <span class="hint">Le certificat est demandé dès l'ajout.</span>
+        </div>
+        <div class="field">
+          <label for="upstream">Port local servi par votre instance</label>
+          <input class="input" id="upstream" name="upstream" value="80" inputmode="numeric">
+        </div>
+      </div>
+      <button class="btn">Router ce domaine</button>
+    </form>
+
+    {% if custom_sites %}
+    <div class="table-wrap mt3">
+      <table class="table">
+        <thead><tr><th>Domaine ajouté</th><th>Port</th><th class="num"></th></tr></thead>
+        <tbody>
+          {% for s in custom_sites %}
+          <tr>
+            <td class="mono small">{{ s['domain'] }}</td>
+            <td class="mono small">:{{ s['upstream'] }}</td>
+            <td class="num">
+              <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="btn btn-sm btn-ghost">Retirer</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </details>
 </div>
 
 <div class="grid cols-2" style="align-items:start">

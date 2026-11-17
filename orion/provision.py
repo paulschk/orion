@@ -187,6 +187,11 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name @@HOSTNAME@@@@DOMAIN_SUFFIX@@ _;
+    # TLS terminates at the edge proxy. Derive the scheme from the forwarding
+    # header so PHP sees HTTPS: without it any app that checks is_ssl() -
+    # WordPress most visibly - bounces admin requests into a redirect loop.
+    set $orion_https "off";
+    if ($http_x_forwarded_proto = "https") { set $orion_https "on"; }
     root /var/www/@@HOSTNAME@@;
     index index.php index.html;
     client_max_body_size 64m;
@@ -196,6 +201,8 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_param HTTPS $orion_https;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
         fastcgi_read_timeout 300;
     }
 
@@ -244,13 +251,36 @@ sudo -u www-data /usr/local/bin/wp core download --locale=fr_FR --force
 sudo -u www-data /usr/local/bin/wp config create   --dbname="${DB_NAME}" --dbuser="${DB_USER}" --dbpass="${DB_PASS}"   --locale=fr_FR --skip-check --force
 sudo -u www-data /usr/local/bin/wp core install   --url="https://@@HOSTNAME@@@@DOMAIN_SUFFIX@@"   --title="@@HOSTNAME@@ - @@BRAND@@"   --admin_user="@@WPADMIN@@"   --admin_password="@@WPPASS@@"   --admin_email="@@WPEMAIL@@"   --skip-email
 sudo -u www-data /usr/local/bin/wp rewrite structure '/%postname%/' --hard
-sudo -u www-data /usr/local/bin/wp option update blogdescription "H\u00e9berg\u00e9 par @@BRAND@@"
+sudo -u www-data /usr/local/bin/wp option update blogdescription "Hébergé par @@BRAND@@"
+
+step "Teaching WordPress it is behind a TLS proxy"
+# WordPress compares siteurl against how PHP sees the request. Handled in nginx
+# too; this covers anything that bypasses that path (WP-CLI, cron, REST).
+install -d -o www-data -g www-data /var/www/@@HOSTNAME@@/wp-content/mu-plugins
+cat > /var/www/@@HOSTNAME@@/wp-content/mu-plugins/00-orion-proxy.php <<'ORION_MU'
+<?php
+/*
+Plugin Name: Orion proxy awareness
+Description: TLS is terminated by the edge proxy, so tell WordPress the request
+is HTTPS. Without this wp-login.php redirects to itself forever.
+*/
+if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+    $_SERVER['SERVER_PORT'] = 443;
+}
+ORION_MU
+chown www-data:www-data /var/www/@@HOSTNAME@@/wp-content/mu-plugins/00-orion-proxy.php
 
 cat > /etc/nginx/sites-available/@@HOSTNAME@@ <<'ORION_NGINX'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name @@HOSTNAME@@@@DOMAIN_SUFFIX@@ _;
+    # TLS terminates at the edge proxy. Derive the scheme from the forwarding
+    # header so PHP sees HTTPS: without it any app that checks is_ssl() -
+    # WordPress most visibly - bounces admin requests into a redirect loop.
+    set $orion_https "off";
+    if ($http_x_forwarded_proto = "https") { set $orion_https "on"; }
     root /var/www/@@HOSTNAME@@;
     index index.php;
     client_max_body_size 64m;
@@ -260,6 +290,8 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_param HTTPS $orion_https;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
         fastcgi_read_timeout 300;
     }
 
@@ -332,6 +364,11 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name @@HOSTNAME@@@@DOMAIN_SUFFIX@@ _;
+    # TLS terminates at the edge proxy. Derive the scheme from the forwarding
+    # header so PHP sees HTTPS: without it any app that checks is_ssl() -
+    # WordPress most visibly - bounces admin requests into a redirect loop.
+    set $orion_https "off";
+    if ($http_x_forwarded_proto = "https") { set $orion_https "on"; }
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -475,6 +512,11 @@ def provision(job_id: int, instance_id: int) -> str:
         log.append(text)
         tasks.append_log(job_id, text + "\n")
 
+    def progress(pct: int, text: str) -> None:
+        """Log a step and publish it, so the panel can show real progress."""
+        tasks.set_progress(job_id, pct, text.replace("== ", ""))
+        emit(text)
+
     instance = db.one("SELECT * FROM instances WHERE id = ?", (instance_id,))
     if instance is None:
         raise RuntimeError(f"instance {instance_id} vanished")
@@ -491,30 +533,32 @@ def provision(job_id: int, instance_id: int) -> str:
                      target=name, detail=message)
 
     try:
-        emit(f"== Orion provisioning: {name} ({tpl.label})")
+        progress(3, f"== Préparation de {name} ({tpl.label})")
         info = detect(force=True)
-        emit(f"== Host {info.host_name}: {info.cpu_total} vCPU, {info.ram_total_mb} MB RAM, pool {info.pool_total_gb} GB")
+        progress(8, f"== Hôte {info.host_name} : {info.cpu_total} vCPU, "
+                    f"{info.ram_total_mb} MB RAM, pool {info.pool_total_gb} GB")
 
         # Ensure the account has somewhere to land before we create anything.
         if not incus.exists(name):
-            emit(f"== Creating container (limits.cpu={plan['vcpu']}, limits.memory={plan['memory_mb']}MiB, root={plan['disk_gb']}GiB)")
+            progress(15, f"== Création du conteneur ({plan['vcpu']} vCPU, "
+                         f"{plan['memory_mb']} MB, {plan['disk_gb']} GB)")
             incus.create(name, vcpu=plan["vcpu"], memory_mb=plan["memory_mb"], disk_gb=plan["disk_gb"])
         else:
-            emit("== Container already exists, reusing it")
+            progress(15, "== Conteneur déjà présent, réutilisé")
             incus.apply_limits(name, vcpu=plan["vcpu"], memory_mb=plan["memory_mb"], disk_gb=plan["disk_gb"])
 
         ip = _wait_for_ip(name)
-        emit(f"== Container address: {ip or 'unknown'}")
+        progress(30, f"== Adresse réseau : {ip or 'inconnue'}")
         if not ip:
             fail("The container never obtained an IP address.")
             return "\n".join(log)
 
-        emit("== Waiting for the container to accept commands")
+        progress(40, "== Démarrage du système")
         if not _wait_for_exec(name):
             fail("The container never became responsive to exec.")
             return "\n".join(log)
 
-        emit("== Publishing SSH on the host")
+        progress(50, "== Publication de l'accès SSH")
         ssh_port = instance["ssh_port"] or allocate_ssh_port()
         incus.set_ssh_proxy(name, ssh_port)
 
@@ -547,7 +591,7 @@ def provision(job_id: int, instance_id: int) -> str:
         if tpl.slug == "wordpress":
             db.set_setting(f"wp_creds_{instance_id}", f"{wp_pass}\n{db_pass}")
 
-        emit("== Uploading and running the provisioning script")
+        progress(58, f"== Installation du modèle : {tpl.label}")
         incus.push_text(name, script, "/root/orion-provision.sh", mode="0755")
         rc, out, err = incus.exec(name, "bash /root/orion-provision.sh", timeout=2400)
         emit(out)
@@ -569,17 +613,18 @@ def provision(job_id: int, instance_id: int) -> str:
         # the config Caddy receives already sees a running instance.
         if tpl.web:
             domain = sites.default_domain(instance["slug"])
-            sites.add_site(instance_id, domain, tpl.port)
+            sites.add_site(instance_id, domain, tpl.port, primary=True)
 
         db.execute("UPDATE instances SET status = 'running', error = '', updated_at = ? WHERE id = ?",
                    (now(), instance_id))
 
         if tpl.web:
             emit(f"== Website route created: {domain} -> {ip}:{tpl.port}")
+            progress(94, "== Application du routage web")
             ok, message = sites.sync_caddy()
             emit(f"== Caddy routing {'applied' if ok else 'FAILED: ' + message}")
 
-        emit("== Done. The instance is online.")
+        progress(100, "== En ligne")
         activity.log("instance.provisioned", user_id=instance["user_id"], target=name,
                      detail=f"{tpl.label} · {ip} · ssh port {ssh_port}")
         return "\n".join(log)

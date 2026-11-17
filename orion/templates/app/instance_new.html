@@ -5,6 +5,11 @@
 {% block content_class %}narrow{% endblock %}
 
 {% block content %}
+{% if error %}
+<div class="alert err" role="alert">
+  <strong>Instanciation impossible.</strong> {{ error }}
+</div>
+{% endif %}
 <form method="post" action="/app/instances">
   <input type="hidden" name="csrf" value="{{ csrf }}">
 
@@ -18,7 +23,8 @@
       <select class="input" id="plan_id" name="plan_id" data-plan-picker="#plan-summary" required>
         {% for plan in plans %}
         <option value="{{ plan['id'] }}" data-summary="{{ plan['vcpu'] }} vCPU · {{ plan['memory_mb']|human_mb }} · {{ plan['disk_gb'] }} GB · {{ plan['price_cents']|money }}/mois"
-          {{ 'selected' if plan['slug'] == preselect_plan }} {{ 'disabled' if plan['is_active'] != 1 }}>
+          {% set sel = preselect_plan|string %}
+          {{ 'selected' if plan['slug'] == sel or plan['id']|string == sel }} {{ 'disabled' if plan['is_active'] != 1 }}>
           {{ plan['name'] }} — {{ plan['price_cents']|money }}/mois
         </option>
         {% endfor %}
@@ -53,13 +59,14 @@
     <div class="card-h"><h2>3. Identification</h2></div>
     <div class="field">
       <label for="name">Nom de l'instance</label>
-      <input class="input" id="name" name="name" placeholder="vitrine, blog, api-interne…" required>
+      <input class="input" id="name" name="name" placeholder="vitrine, blog, api-interne…"
+             value="{{ form_name or '' }}" required>
       <span class="hint">Sert de nom d'hôte et d'adresse : <span class="mono">nom.{{ domain }}</span></span>
     </div>
     <div class="field">
       <label for="ssh_public_key">Clé SSH publique <span class="dim">(recommandé)</span></label>
       <textarea class="input" id="ssh_public_key" name="ssh_public_key"
-                placeholder="ssh-ed25519 AAAAC3Nza… vous@machine">{{ user['ssh_public_key'] or '' }}</textarea>
+                placeholder="ssh-ed25519 AAAAC3Nza… vous@machine">{{ form_key or user['ssh_public_key'] or '' }}</textarea>
       <span class="hint">
         Sans clé, un mot de passe temporaire est généré pour votre compte et affiché sur la page
         de l'instance. Il est préférable de renseigner une clé.

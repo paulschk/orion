@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS sites (
     domain       TEXT    NOT NULL UNIQUE,
     upstream     INTEGER NOT NULL DEFAULT 80,
     enabled      INTEGER NOT NULL DEFAULT 1,
+    is_primary   INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT    NOT NULL
 );
 
@@ -131,6 +132,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     kind        TEXT    NOT NULL,
     instance_id INTEGER,
     status      TEXT    NOT NULL DEFAULT 'queued',
+    progress    INTEGER NOT NULL DEFAULT 0,
+    step        TEXT    NOT NULL DEFAULT '',
     log         TEXT    NOT NULL DEFAULT '',
     created_at  TEXT    NOT NULL,
     finished_at TEXT
@@ -264,6 +267,40 @@ def migrate() -> None:
         if "machine_id" not in _columns(cur, "instances"):
             cur.execute("ALTER TABLE instances ADD COLUMN machine_id TEXT NOT NULL DEFAULT ''")
             print("[orion] schema: added instances.machine_id")
+
+        job_columns = _columns(cur, "jobs")
+        if "progress" not in job_columns:
+            cur.execute("ALTER TABLE jobs ADD COLUMN progress INTEGER NOT NULL DEFAULT 0")
+            print("[orion] schema: added jobs.progress")
+        if "step" not in job_columns:
+            cur.execute("ALTER TABLE jobs ADD COLUMN step TEXT NOT NULL DEFAULT ''")
+            print("[orion] schema: added jobs.step")
+
+        site_columns = _columns(cur, "sites")
+        if "is_primary" not in site_columns:
+            cur.execute("ALTER TABLE sites ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
+            print("[orion] schema: added sites.is_primary")
+
+    # Backfill: the site whose domain is the instance's generated name is the
+    # instance's own address. Tracking that explicitly means renaming it later
+    # does not make it look like a client-supplied domain.
+    for row in query("SELECT s.id, s.domain, i.slug FROM sites s "
+                     "JOIN instances i ON i.id = s.instance_id"):
+        if row["domain"].startswith(f"{row['slug']}."):
+            execute("UPDATE sites SET is_primary = 1 WHERE id = ?", (row["id"],))
+
+    # The SSH port must be unique: two instances provisioning at once used to
+    # pick the same one and the second failed to bind its proxy device.
+    duplicates = query(
+        "SELECT ssh_port, COUNT(*) AS n FROM instances WHERE ssh_port IS NOT NULL "
+        "GROUP BY ssh_port HAVING n > 1")
+    if duplicates:
+        print("[orion] WARNING: duplicate ssh_port values present, not enforcing uniqueness:",
+              ", ".join(f"{r['ssh_port']}x{r['n']}" for r in duplicates))
+    else:
+        with cursor(commit=True) as cur:
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_instances_ssh_port "
+                        "ON instances(ssh_port) WHERE ssh_port IS NOT NULL")
 
     # Every instance gets a machine id. The SSH account name can only be changed
     # safely for instances that were never provisioned: on a live container the

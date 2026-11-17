@@ -4,11 +4,45 @@
   {% if live_status and live_status != instance['status'] %}<span class="badge idle">Incus : {{ live_status }}</span>{% endif %}
   {% if instance['container_ip'] %}<span class="tiny dim mono">{{ instance['container_ip'] }}</span>{% endif %}
 </div>
+
 {% if instance['status'] == 'provisioning' %}
-  <p class="small muted mt2">Installation en cours. Cette page se rafraîchit toute seule.</p>
-  {% if job %}<div class="bar"><span style="width:{{ 100 if job['status'] == 'done' else 62 }}%"></span></div>{% endif %}
+  {% set pct = job['progress'] if job and job['progress'] else 2 %}
+  <div class="loader mt2">
+    <div class="loader-head">
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="loader-step">
+        {% if job and job['step'] %}{{ job['step'] }}{% else %}Démarrage du provisionnement…{% endif %}
+      </span>
+      <span class="loader-pct mono">{{ pct }}%</span>
+    </div>
+    <div class="bar"><span style="width:{{ pct }}%" data-target="{{ pct }}"></span></div>
+
+    {% if steps %}
+    <ul class="steps">
+      {% for step in steps[-5:] %}
+      <li class="{{ 'current' if loop.last else 'done' }}">
+        <span class="tick">{{ '•' if loop.last else '✓' }}</span>{{ step }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <p class="tiny dim mt2">
+      L'installation du modèle prend une à deux minutes. Cette page se met à jour toute seule&nbsp;:
+      vous n'avez rien à recharger.
+    </p>
+  </div>
+
 {% elif instance['status'] == 'error' %}
   <p class="small mt2" style="color:var(--bad)">{{ instance['error'] }}</p>
+  {% if steps %}
+  <ul class="steps mt2">
+    {% for step in steps[-4:] %}
+    <li class="done"><span class="tick">✓</span>{{ step }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
 {% elif metrics %}
   <dl class="kv mt2">
     <dt>Mémoire</dt><dd class="mono">{{ metrics['memory_used']|human_bytes }}{% if memory_cap %} / {{ memory_cap }}{% endif %}</dd>

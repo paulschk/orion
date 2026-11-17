@@ -1,5 +1,43 @@
 /* Small helpers. Everything else is server-rendered. */
 
+// Cross-fade page changes instead of flashing white between navigations.
+if (window.htmx) { htmx.config.globalViewTransitions = true; }
+
+// Poll the status fragment *only* while something is actually happening. It
+// used to keep firing every 3 seconds forever, which made the page twitch.
+function orionSyncPolling() {
+  const box = document.getElementById('instance-status');
+  if (!box) return;
+  const status = box.dataset.knownStatus || '';
+  const quiet = ['running', 'stopped', 'error', 'destroyed'];
+  if (quiet.indexOf(status) !== -1) {
+    if (box.hasAttribute('hx-trigger')) {
+      box.removeAttribute('hx-trigger');
+      box.removeAttribute('hx-get');
+      if (window.htmx) { htmx.process(box); }
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', orionSyncPolling);
+document.addEventListener('htmx:load', orionSyncPolling);
+
+// Ease the provisioning bar towards the value the server reported, so progress
+// moves continuously instead of stepping every poll.
+let orionBarShown = 0;
+setInterval(function () {
+  const span = document.querySelector('#instance-status .bar > span');
+  if (!span) { orionBarShown = 0; return; }
+  const target = Number(span.dataset.target || 0);
+  if (!orionBarShown) { orionBarShown = Math.min(target || 2, 3); }
+  if (orionBarShown < target) {
+    orionBarShown = Math.min(target, orionBarShown + Math.max(0.7, (target - orionBarShown) * 0.16));
+  } else {
+    orionBarShown = target;
+  }
+  span.style.width = orionBarShown.toFixed(1) + '%';
+}, 500);
+
+
 // Template picker on the "new instance" page.
 document.addEventListener('click', function (event) {
   const tpl = event.target.closest('.tpl');
@@ -68,8 +106,11 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
   const next = fresh.dataset.instanceStatus;
   const known = container.dataset.knownStatus;
   container.dataset.knownStatus = next;
+  orionSyncPolling();
   if (known === undefined || known === next) return;
   if (next === 'running' || next === 'error') {
+    // The sections that only make sense on a live instance (terminal, SSH
+    // details, snapshots) are server-rendered, so reload exactly once here.
     window.location.reload();
   }
 });

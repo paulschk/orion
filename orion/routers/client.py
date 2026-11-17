@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
+from urllib.parse import quote
 
 from .. import activity, billing, db, identity, provision, sites, tasks
 from ..config import settings
@@ -28,7 +32,13 @@ def _owned(instance_id: int, session):
 
 
 def _slug_available(candidate: str) -> bool:
-    return db.one("SELECT 1 FROM instances WHERE slug = ? AND status != 'destroyed'", (candidate,)) is None
+    """Slugs must be unique across *all* rows, destroyed instances included.
+
+    The container name is derived from the slug and instances.incus_name is
+    UNIQUE, so reusing the name of a destroyed instance used to make the insert
+    fail with a 500 rather than quietly picking a free name.
+    """
+    return db.one("SELECT 1 FROM instances WHERE slug = ?", (candidate,)) is None
 
 
 def unique_slug(base: str) -> str:
@@ -40,6 +50,32 @@ def unique_slug(base: str) -> str:
         if _slug_available(candidate):
             return candidate
     return f"{slug}-{rand_password(4).lower()}"
+
+
+def _render_new(request: Request, session, *, error: str = "", **values):
+    """Re-render the creation form with its values intact.
+
+    Redirecting on a validation failure lost everything the client had typed -
+    which is exactly what happened when the memory check refused a template.
+    """
+    info = detect()
+    return render(request, "app/instance_new.html", session=session,
+                  plans=db.query("SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order"),
+                  templates=[{"tpl": tpl, "capacity": None} for tpl in provision.template_list()],
+                  info=info, headroom=headroom(info),
+                  preselect_plan=values.get("plan_id", ""),
+                  preselect_template=values.get("template", "lemp"),
+                  form_name=values.get("name", ""),
+                  form_key=values.get("ssh_key", ""),
+                  error=error)
+
+
+def _job_steps(job) -> list[str]:
+    """The '== ' lines a provisioning job has logged, as readable steps."""
+    if not job or not job["log"]:
+        return []
+    return [line[3:].strip() for line in job["log"].splitlines()
+            if line.startswith("== ") and line[3:].strip()]
 
 
 def instance_context(instance, *, deep: bool = True) -> dict:
@@ -65,14 +101,30 @@ def instance_context(instance, *, deep: bool = True) -> dict:
         row = db.one("SELECT memory_mb FROM plans WHERE id = ?", (instance["plan_id"],))
         if row:
             plan_memory = f"{row['memory_mb']} MB"
+
+    site_rows = sites.list_sites(instance["id"])
+    default_site = next((s for s in site_rows if s["is_primary"]), None)
+    if default_site is None:
+        # Older rows, or an instance whose site has not been created yet.
+        default_domain = sites.default_domain(instance["slug"])
+        default_site = next((s for s in site_rows if s["domain"] == default_domain), None)
+    else:
+        default_domain = default_site["domain"]
+    job = tasks.latest_for_instance(instance["id"])
     return {
         "instance": instance,
         "metrics": metrics,
         "live_status": live_status,
         "memory_cap": plan_memory,
         "snapshots": snapshot_rows,
-        "site_rows": sites.list_sites(instance["id"]),
-        "job": tasks.latest_for_instance(instance["id"]),
+        "site_rows": site_rows,
+        "default_site": default_site,
+        "default_domain": default_domain,
+        "custom_sites": [s for s in site_rows if s is not default_site],
+        "tenant_domain": settings.domain,
+        "ingress_ip": settings.ingress_ip,
+        "steps": _job_steps(job),
+        "job": job,
         "ssh_host": settings.ssh_host,
         "ssh_command": (
             identity.ssh_command(host=settings.ssh_host, port=instance["ssh_port"],
@@ -158,20 +210,23 @@ async def instance_create(request: Request):
 
     plan = db.one("SELECT * FROM plans WHERE id = ? AND is_active = 1", (plan_id,))
     if plan is None:
-        return RedirectResponse("/app/instances/new?err=Offre+inconnue", status_code=303)
+        return _render_new(request, session, error="Offre inconnue.",
+                           plan_id=plan_id, template=template_slug, name=name, ssh_key=ssh_key)
     tpl = provision.get_template(template_slug)
 
     if tpl.min_memory_mb and plan["memory_mb"] < tpl.min_memory_mb:
         message = (f"Le mod\u00e8le {tpl.label} demande au moins {tpl.min_memory_mb} MB "
                    f"de RAM ; l\u2019offre {plan['name']} en propose {plan['memory_mb']} MB.")
-        return RedirectResponse(f"/app/instances/new?plan={plan['slug']}&err={message}", status_code=303)
+        return _render_new(request, session, error=message, plan_id=plan["id"],
+                           template=tpl.slug, name=name, ssh_key=ssh_key)
 
     info = detect()
     will_fit, blocked_on = fits(info, plan["vcpu"], plan["memory_mb"], plan["disk_gb"])
     if not will_fit:
         message = (f"Capacit\u00e9 insuffisante sur {info.host_name} : plus assez de {blocked_on} "
                    f"disponible. Contactez l\u2019administrateur.")
-        return RedirectResponse(f"/app/instances/new?plan={plan['slug']}&err={message}", status_code=303)
+        return _render_new(request, session, error=message, plan_id=plan["id"],
+                           template=tpl.slug, name=name, ssh_key=ssh_key)
 
     if ssh_key and "ssh-" in ssh_key.split(" ")[0]:
         db.execute("UPDATE users SET ssh_public_key = ? WHERE id = ?", (ssh_key, session["uid"]))
@@ -183,15 +238,36 @@ async def instance_create(request: Request):
     # never "orion" on every box, and support can refer to one machine by name.
     taken = {r["ssh_user"] for r in db.query("SELECT ssh_user FROM instances")}
     ssh_user = identity.derive_ssh_user(slug, taken)
-    instance_id = db.execute(
-        "INSERT INTO instances(user_id, plan_id, name, slug, incus_name, machine_id, template, "
-        "status, ssh_user, initial_password, created_at, expires_at) "
-        "VALUES(?, ?, ?, ?, ?, ?, ?, 'provisioning', ?, ?, ?, ?)",
-        (session["uid"], plan["id"], name or slug, slug,
-         provision.incus_name_for(session["uid"], slug), identity.new_machine_id(), tpl.slug,
-         ssh_user, rand_password(20), now(),
-         days_from_now(plan["period_days"])),
-    )
+
+    # Claim the SSH port here rather than in the worker: two instances
+    # provisioning at the same time used to read the same table, pick the same
+    # free port, and the second one died failing to bind its proxy device.
+    try:
+        ssh_port = provision.allocate_ssh_port()
+    except RuntimeError:
+        return _render_new(request, session,
+                           error="Plus aucun port SSH disponible sur cet hôte. "
+                                 "Prévenez l'administrateur.")
+
+    try:
+        instance_id = db.execute(
+            "INSERT INTO instances(user_id, plan_id, name, slug, incus_name, machine_id, template, "
+            "status, ssh_user, ssh_port, initial_password, created_at, expires_at) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, 'provisioning', ?, ?, ?, ?, ?)",
+            (session["uid"], plan["id"], name or slug, slug,
+             provision.incus_name_for(session["uid"], slug), identity.new_machine_id(), tpl.slug,
+             ssh_user, ssh_port, rand_password(20), now(),
+             days_from_now(plan["period_days"])),
+        )
+    except sqlite3.IntegrityError as exc:
+        # Last line of defence: the name or port was taken in the meantime.
+        activity.log("instance.create_conflict", user_id=session["uid"],
+                     target=slug, detail=str(exc))
+        return _render_new(request, session,
+                           error="Ce nom vient d'être pris ou plus aucun port n'est libre. "
+                                 "Réessayez avec un autre nom.",
+                           plan_id=plan["id"], template=tpl.slug, name=name,
+                           ssh_key=ssh_key)
 
     _, invoice_id = billing.subscribe(session["uid"], plan["id"], instance_id)
     activity.log("instance.created", user_id=session["uid"], target=slug,
@@ -253,13 +329,30 @@ async def snapshot_create(request: Request, instance_id: int):
     instance = _owned(instance_id, session)
     if instance is None:
         return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
-    label = slugify(fstr(form, "label", "") or f"snap-{now()[:10]}")
+    # Name snapshots after the instance and the minute they were taken. A bare
+    # "snap-YYYY-MM-DD" collided the second time you tried on the same day and
+    # Incus refused it with a raw database error.
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
+    requested = fstr(form, "label", "")
+    base = slugify(f"{instance['slug']}-{requested}-{stamp}" if requested
+                   else f"{instance['slug']}-{stamp}")
+    existing = {s.get("name") for s in (incus.snapshots(instance["incus_name"]) or [])}
+    label, suffix = base, 2
+    while label in existing:
+        label = f"{base[:50]}-{suffix}"
+        suffix += 1
+
     try:
         incus.snapshot_create(instance["incus_name"], label)
-        activity.log("instance.snapshot", user_id=session["uid"], target=instance["slug"], detail=label)
-        return RedirectResponse(f"/app/instances/{instance_id}?ok=Sauvegarde+cr%C3%A9%C3%A9e", status_code=303)
     except IncusError as exc:
-        return RedirectResponse(f"/app/instances/{instance_id}?err={exc.detail}", status_code=303)
+        detail = exc.detail
+        if "already exists" in detail:
+            detail = f"Un instantané nommé {label} existe déjà. Réessayez dans une minute."
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(detail)}", status_code=303)
+    activity.log("instance.snapshot", user_id=session["uid"], target=instance["slug"], detail=label)
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok={quote(f'Instantané {label} créé')}", status_code=303)
 
 
 @router.post("/instances/{instance_id}/snapshots/{snapshot}/restore")
@@ -293,6 +386,46 @@ async def snapshot_delete(request: Request, instance_id: int, snapshot: str):
     except IncusError as exc:
         return RedirectResponse(f"/app/instances/{instance_id}?err={exc.detail}", status_code=303)
     return RedirectResponse(f"/app/instances/{instance_id}?ok=Sauvegarde+supprim%C3%A9e", status_code=303)
+
+
+@router.post("/instances/{instance_id}/subdomain")
+async def subdomain_set(request: Request, instance_id: int):
+    """Simple mode: change only the label of the instance's own subdomain."""
+    session = require_user(request)
+    form = await request.form()
+    guard_csrf(request, session, form)
+    instance = _owned(instance_id, session)
+    if instance is None:
+        return RedirectResponse("/app/instances?err=Instance+introuvable", status_code=303)
+
+    label = slugify(fstr(form, "label"))
+    if not label or label in ("www", "mail", "ftp", "ns", "admin"):
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote('Sous-domaine invalide.')}", status_code=303)
+
+    domain = f"{label}.{settings.domain}"
+    clash = db.one("SELECT * FROM sites WHERE domain = ?", (domain,))
+    if clash is not None and clash["instance_id"] != instance_id:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote(f'{domain} est déjà utilisé par une autre instance.')}",
+            status_code=303)
+
+    primary = db.one("SELECT * FROM sites WHERE instance_id = ? AND is_primary = 1", (instance_id,))
+    if primary is None:
+        sites.add_site(instance_id, domain, 80, primary=True)
+    else:
+        db.execute("UPDATE sites SET domain = ? WHERE id = ?", (domain, primary["id"]))
+
+    ok, message = sites.sync_caddy()
+    activity.log("site.subdomain_set", user_id=session["uid"], target=domain,
+                 detail=instance["slug"])
+    if not ok:
+        return RedirectResponse(
+            f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
+            status_code=303)
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok={quote(f'Adresse mise à jour : {domain}')}",
+        status_code=303)
 
 
 @router.post("/instances/{instance_id}/sites")

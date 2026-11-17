@@ -64,6 +64,12 @@ def append_log(job_id: int, text: str) -> None:
     db.execute("UPDATE jobs SET log = log || ? WHERE id = ?", (text, job_id))
 
 
+def set_progress(job_id: int, progress: int, step: str = "") -> None:
+    """Publish a percentage and the step name, for the panel's loader."""
+    db.execute("UPDATE jobs SET progress = ?, step = ? WHERE id = ?",
+               (max(0, min(100, int(progress))), step[:120], job_id))
+
+
 def latest_for_instance(instance_id: int):
     return db.one(
         "SELECT * FROM jobs WHERE instance_id = ? ORDER BY id DESC LIMIT 1", (instance_id,))

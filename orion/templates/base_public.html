@@ -24,7 +24,9 @@
     </nav>
   </div>
 </div>
+<main id="main">
 {% block content %}{% endblock %}
+</main>
 <div class="container" style="padding:34px 24px;border-top:1px solid var(--border)">
   <div class="spread small dim">
     <span>{{ app_name }} — panneau d'hébergement auto-hébergé, {{ brand }}</span>
@@ -32,5 +34,6 @@
   </div>
 </div>
 {% block scripts %}{% endblock %}
+<script src="/static/js/orion-public.js?v={{ asset_version }}" defer></script>
 </body>
 </html>
