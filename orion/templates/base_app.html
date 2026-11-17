@@ -18,9 +18,6 @@
       <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
     </div>
 
-    {# On a phone this is where the primary action belongs, not in the title bar. #}
-    <a class="btn btn-primary side-cta" href="/app/instances/new">Nouvelle instance</a>
-
     {% if user['role'] == 'admin' %}
       <div class="nav-label">Exploitation</div>
       <a class="nav {{ 'active' if path == '/admin' }}" href="/admin">Vue d'ensemble</a>
@@ -38,6 +35,9 @@
     <div class="nav-label">{{ 'Mon espace' if user['role'] != 'admin' else 'Espace client' }}</div>
     <a class="nav {{ 'active' if path == '/app' }}" href="/app">Tableau de bord</a>
     <a class="nav {{ 'active' if path.startswith('/app/instances') }}" href="/app/instances">Mes instances</a>
+    {# Not a second section: creating an instance belongs to "Mes instances", so
+       that is the item that lights up on /app/instances/new. This link is the
+       only remaining way in, so it stays. #}
     <a class="nav" href="/app/instances/new">Nouvelle instance</a>
     <a class="nav {{ 'active' if path.startswith('/app/factures') }}" href="/app/factures">Factures</a>
     <a class="nav {{ 'active' if path.startswith('/app/compte') }}" href="/app/compte">Compte</a>
@@ -62,16 +62,16 @@
       </div>
       <div class="topbar-actions">
         {% block actions %}{% endblock %}
-        <a class="btn btn-primary btn-sm" href="/app/instances/new">Nouvelle instance</a>
       </div>
     </header>
     <div class="content {% block content_class %}{% endblock %}">
       {# The title bar carries the menu button and the heading only on a phone,
-         so the page's own actions are rendered here instead. #}
-      <div class="content-actions">
-        {{ self.actions() }}
-        <a class="btn btn-primary btn-sm" href="/app/instances/new">Nouvelle instance</a>
-      </div>
+         so the page's own actions are rendered here instead. Nothing at all
+         when the page has no actions of its own. #}
+      {% set page_actions = self.actions() %}
+      {% if page_actions|trim %}
+      <div class="content-actions">{{ page_actions }}</div>
+      {% endif %}
       {% include "partials/flash.html" %}
       {% block content %}{% endblock %}
     </div>

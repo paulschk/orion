@@ -370,7 +370,7 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
    primary action is repeated in the drawer so it stays one tap away. */
 .topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .content-actions { display: none; }
-.topbar .side-cta, .side-cta { display: none; }
+
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 16px 28px; border-bottom: 1px solid var(--border);
@@ -493,7 +493,6 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   .topbar-actions { display: none; }
   .content-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .content-actions .btn { flex: 1 1 auto; justify-content: center; }
-  .side-cta { display: block; text-align: center; margin: 2px 0 12px; }
   .content { padding: 20px 16px 48px; }
   .hero h1 { font-size: 1.8rem; }
 }
