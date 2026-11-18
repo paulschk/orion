@@ -7,8 +7,8 @@
 {% block heading %}{{ instance['name'] }}{% endblock %}
 
 {% block actions %}
-  {# L'ancre visait #console, qui n'existe pas : le terminal porte #terminal. #}
-  <a class="btn btn-sm" href="#terminal">Console</a>
+{# Le bouton Console visait l'ancre du terminal, juste en dessous. La page tient
+   en un écran : l'ancre ne servait à rien, et le titre n'a pas besoin d'action. #}
 {% endblock %}
 
 {# Ce que le prototype met entre le titre et les actions : les trois chiffres
@@ -109,6 +109,10 @@
   <section class="tile span8">
     <div class="tile-h">
       <h2>Terminal</h2>
+      {# À côté du titre : plein écran sur le panneau, pour ne lire que le
+         terminal. Le module du terminal branche le bouton et redimensionne le
+         panneau à la fenêtre — l'API plein écran fait le reste, Échap compris. #}
+      <button class="btn btn-sm btn-ghost" type="button" id="term-fs">Plein écran</button>
       <span class="sub" id="terminal-status"></span>
     </div>
     <div id="terminal" class="term-pane"
@@ -203,18 +207,6 @@
     </div>
   </section>
 
-  <section class="tile span7 fill">
-    <div class="tile-h">
-      <h2>Journal de provisionnement</h2>
-      <span class="sub mono">{{ job['status'] if job else '—' }}</span>
-    </div>
-    {% if job and job['log'] %}
-      <div class="job-log">{{ job['log'] }}</div>
-    {% else %}
-      <p class="small dim">Aucun journal disponible.</p>
-    {% endif %}
-  </section>
-
   <section class="tile span12 danger">
     <div class="tile-h"><h2>Zone sensible</h2></div>
     <p class="small muted mb2">
@@ -229,6 +221,21 @@
       </div>
     </form>
   </section>
+
+  {# Le journal sous la zone sensible, et replié : on y revient en cas de doute,
+     pas pour se rassurer. Le repli suit le journal qui défile — c'est ce qu'on
+     lit une fois, et il ne pousse plus la page. #}
+  <details class="tile span12 journal-fold">
+    <summary>
+      <h2>Journal de provisionnement</h2>
+      <span class="sub mono">{{ job['status'] if job else '—' }}</span>
+    </summary>
+    {% if job and job['log'] %}
+      <div class="job-log">{{ job['log'] }}</div>
+    {% else %}
+      <p class="small dim">Aucun journal disponible.</p>
+    {% endif %}
+  </details>
 
 </div>
 {% endblock %}

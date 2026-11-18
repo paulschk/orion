@@ -337,6 +337,9 @@ details summary:hover{color:var(--ink)}
    keeps the gutter the grid would have given it. */
 .content > .card,.content > .alert,.content > .empty,.content > .stack,
 .content > .table-wrap{margin:16px 24px 0}
+/* La page d'une nouvelle instance range ses cartes dans son formulaire : sans
+   cette règle-ci, elle était la seule sans gouttière sur grand écran. */
+.content > form > .card{margin:16px 24px 0}
 .content-row{padding:16px 24px 0}
 .band-note{font-size:11px;color:var(--dim)}
 /* L'IP, le port SSH et le disque se lisent sur la ligne du fil d'Ariane, pas au
@@ -348,6 +351,31 @@ details summary:hover{color:var(--ink)}
    secondes pendant le provisionnement — dit où il en est. Aucun script : la
    règle est accrochée à l'état que le fragment porte lui-même. */
 .band-row:has([data-instance-status="provisioning"]) .power{display:none}
+/* Le plein écran du terminal : le panneau est redimensionné à la fenêtre par le
+   module, qui écrit sa hauteur en ligne — la feuille ne fait que teindre le fond
+   qui reste autour, de la couleur du terminal. */
+.term-pane:fullscreen{background:#05070d}
+/* Le bouton plein écran suit le titre. `.tile-h > .btn` porte une auto-marge qui
+   le renvoie à l'autre bout de la tête, et l'espacement « entre les enfants »
+   l'aurait posé au milieu : ni l'un ni l'autre ne le met à côté du titre. Le
+   statut, lui, part à droite. */
+.tile-h:has(> #term-fs){justify-content:flex-start}
+.tile-h:has(> #term-fs) > .btn{margin-left:0}
+.tile-h:has(> #term-fs) > .sub{margin-left:auto}
+/* Le journal se replie, et vit sous la zone sensible. Le résumé prend la tête de
+   tuile ordinaire, avec un mot qui dit ce que le clic fait. */
+details.journal-fold > summary{display:flex;align-items:baseline;gap:12px;cursor:pointer;
+  list-style:none}
+details.journal-fold > summary::-webkit-details-marker{display:none}
+details.journal-fold > summary h2{font-size:13.5px}
+details.journal-fold > summary .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+details.journal-fold > summary::after{content:'Afficher ▸';margin-left:auto;font-family:var(--mono);
+  font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent)}
+details.journal-fold[open] > summary::after{content:'Replier ▾'}
+details.journal-fold > summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Sur un téléphone, la légende des quatre états tient trois lignes sous le titre
+   du bandeau et ne sert qu'à expliquer les pastilles qui sont juste en dessous. */
+@media (max-width:900px){.legend{display:none}}
 /* The plan reference as the admin dashboard prints it (the prototype styles the
    table cell, this is the same thing beside a title). */
 .slug{font-family:var(--mono);font-size:10.5px;color:var(--dim);border:1px solid var(--line);

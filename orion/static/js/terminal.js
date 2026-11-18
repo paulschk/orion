@@ -17,6 +17,24 @@
   // keyboard handler and the sizing were ever installed.
   if (!pane || !pane.classList.contains('term-pane') || !window.Terminal) return;
 
+  // Le plein écran, branché avant tout le reste : il marche aussi sur une
+  // instance arrêtée — l'écran dit alors pourquoi il n'y a pas de session. Le
+  // navigateur fournit Échap, et le redimensionnement qui suit le changement.
+  const fsButton = document.getElementById('term-fs');
+  if (fsButton) {
+    if (!pane.requestFullscreen) {
+      fsButton.hidden = true;             // API absente : offrir le bouton mentirait
+    } else {
+      fsButton.addEventListener('click', function () {
+        if (document.fullscreenElement === pane) document.exitFullscreen();
+        else pane.requestFullscreen();
+      });
+      document.addEventListener('fullscreenchange', function () {
+        fsButton.textContent = document.fullscreenElement === pane ? 'Quitter' : 'Plein écran';
+      });
+    }
+  }
+
   const statusEl = document.getElementById('terminal-status');
   const setStatus = (text, tone) => {
     if (!statusEl) return;
@@ -252,7 +270,15 @@
     const usable = pane.clientWidth - (parseFloat(style.paddingLeft) || 0)
       - (parseFloat(style.paddingRight) || 0);
     const cols = Math.max(20, Math.floor(usable / cellW));
-    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - fixed) / cellH));
+    // Plein écran : la cible devient la fenêtre, moins le chrome et le dégagement
+    // du bas — les termes du calcul de hauteur, pour que le panneau remplisse
+    // sans jamais dépasser. Les 8 px couvrent l'offset du moteur mesuré plus bas.
+    // Jamais `pane.clientHeight` : c'est la valeur écrite en fin de fonction, et
+    // la relire est la boucle qui replie le panneau une rangée à la fois.
+    const target = document.fullscreenElement === pane
+      ? window.innerHeight - fixed - (BASE_PAD + EXTRA_ROWS * cellH) - 8
+      : TARGET_HEIGHT;
+    const rows = Math.max(2, Math.floor((target - fixed) / cellH));
 
     if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
 
