@@ -241,6 +241,11 @@
 {% endblock %}
 
 {% block scripts %}
+{# La feuille de xterm est aussi posée ici, dans le corps : la version de
+   l'en-tête couvre le premier affichage, mais htmx ne fusionne pas l'en-tête
+   d'une page arrivée par un lien — le terminal s'afficherait sans ses styles.
+   Même adresse, donc un seul téléchargement. #}
+<link rel="stylesheet" href="/static/vendor/xterm.min.css?v={{ asset_version }}">
 <script src="/static/vendor/xterm.min.js?v={{ asset_version }}"></script>
 <script src="/static/vendor/addon-fit.min.js?v={{ asset_version }}"></script>
 <script src="/static/js/terminal.js?v={{ asset_version }}"></script>

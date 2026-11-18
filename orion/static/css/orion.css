@@ -651,7 +651,8 @@ html{overflow-y:scroll;scrollbar-gutter:stable}
 /* Passer du site de présentation à l'espace client — et l'inverse, et la
    connexion — est une navigation entre documents : le navigateur sait fondre
    l'une dans l'autre quand on le lui demande, sans script et sans rien changer
-   d'autre. L'opt-in est dans l'en-tête des deux coquilles. */
+   d'autre. L'opt-in est dans l'en-tête des deux coquilles, et la règle est ici,
+   à la racine de la feuille — c'est là qu'elle doit être pour être lue. */
 @view-transition{navigation:auto}
 
 /* -------------------------------------------------- le tiroir, sous 900 px */
