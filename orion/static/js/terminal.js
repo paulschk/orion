@@ -219,7 +219,9 @@
     const screen = pane.querySelector('.xterm-screen');
     if (!xterm || !screen) return;
     const style = getComputedStyle(pane);
-    const fixed = BASE_PAD + ['paddingTop', 'borderTopWidth', 'borderBottomWidth']
+    // The pane's own top chrome only: the bottom padding is written below, so
+    // reading it here would feed the height back into itself.
+    const fixed = ['paddingTop', 'borderTopWidth', 'borderBottomWidth']
       .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
 
     const cell = term.rows > 0 ? screen.getBoundingClientRect().height / term.rows : 0;
@@ -242,11 +244,19 @@
     const xtermStyle = getComputedStyle(xterm);
     const screenTop = screenRect.top - xtermRect.top
       - (parseFloat(xtermStyle.borderTopWidth) || 0) - (parseFloat(xtermStyle.paddingTop) || 0);
-    const needed = screenTop + screenRect.height + EXTRA_ROWS * cell;
+    const needed = screenTop + screenRect.height;
+
+    // The clearance belongs to the *pane's* bottom padding, not to the inside of
+    // the terminal. The viewport is stretched over its container, so space
+    // reserved inside `.xterm` puts the foot of the scrollable area below the
+    // last line of text - the wheel keeps scrolling past the end of the output
+    // and the viewport no longer ends where the terminal does.
+    const padBottom = BASE_PAD + EXTRA_ROWS * cell;
+    if (pane.style.paddingBottom !== padBottom + 'px') pane.style.paddingBottom = padBottom + 'px';
 
     // Not rounded: a whole-pixel container around a fractional screen is exactly
     // the remainder this is meant to remove.
-    const wanted = needed + fixed + 'px';
+    const wanted = needed + fixed + padBottom + 'px';
     if (pane.style.height !== wanted) pane.style.height = wanted;
   }
 

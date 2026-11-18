@@ -12,27 +12,45 @@
   </div>
 
   {% if default_site %}
-    <div class="codebox mt2">
-      <a href="https://{{ default_site['domain'] }}" target="_blank" rel="noopener"
-         style="text-decoration:none">{{ default_site['domain'] }}</a>
-      <button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
-              data-copy="https://{{ default_site['domain'] }}">Copier</button>
-    </div>
-    <p class="tiny dim mt1">Servie par votre instance sur le port {{ default_site['upstream'] }}.</p>
+  {# The address is what this card is about, so it gets the room: the label in
+     the accent colour, the shared domain dimmed behind it, what it is served
+     with pushed to the right, and one button. The copy button used to be
+     floated over a code box with negative margins to tuck it inside the
+     padding. #}
+  {% set is_tenant = default_site['domain'].endswith('.' + tenant_domain) %}
+  {% set label = default_site['domain'][:-(tenant_domain|length + 1)] if is_tenant
+                 else default_site['domain'] %}
+  <div class="addr-card">
+    <a class="addr-main mono" href="https://{{ default_site['domain'] }}" target="_blank" rel="noopener">
+      <span class="addr-label">{{ label }}</span>{% if is_tenant %}<span class="addr-zone">.{{ tenant_domain }}</span>{% endif %}
+    </a>
+    <span class="addr-tags">
+      <span class="badge ok">HTTPS</span>
+      <span class="badge idle">port {{ default_site['upstream'] }}</span>
+    </span>
+    <button class="btn btn-sm btn-ghost" data-copy="https://{{ default_site['domain'] }}"
+            title="Copier l'adresse">Copier</button>
+  </div>
 
-    <details class="mt2">
-      <summary class="small">Changer le sous-domaine</summary>
-      <form method="post" action="/app/instances/{{ instance['id'] }}/subdomain" class="mt2">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <div class="row tight">
-          <input class="input grow mono" name="label" aria-label="Sous-domaine"
-                 value="{{ default_site['domain'].split('.')[0] }}">
-          <span class="dim mono">.{{ tenant_domain }}</span>
-          <button class="btn btn-sm">Renommer</button>
-        </div>
-        <span class="hint">L'ancienne adresse cesse de fonctionner. Le certificat suit automatiquement.</span>
-      </form>
-    </details>
+  {% if is_tenant %}
+  <details class="inline-edit mt2">
+    <summary>Changer le sous-domaine</summary>
+    {# In place, like every other action on this page: a full reload takes the
+       terminal session down with it. #}
+    <form method="post" action="/app/instances/{{ instance['id'] }}/subdomain" class="mt1"
+          hx-post="/app/instances/{{ instance['id'] }}/subdomain"
+          hx-target="#instance-addresses" hx-swap="innerHTML">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row tight">
+        <input class="input input-sm mono" name="label" aria-label="Sous-domaine"
+               value="{{ label }}" style="width:11rem" spellcheck="false" autocapitalize="off">
+        <span class="dim mono tiny">.{{ tenant_domain }}</span>
+        <button class="btn btn-sm">Renommer</button>
+      </div>
+      <span class="hint">L'ancienne adresse cesse de fonctionner. Le certificat suit automatiquement.</span>
+    </form>
+  </details>
+  {% endif %}
   {% else %}
     <p class="small muted mt2">
       Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.

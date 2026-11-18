@@ -268,6 +268,33 @@ details > summary:hover { color: var(--text); }
 .loader-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* -------------------------------------------------------------- addresses */
+/* The address is the subject of the simple-mode card, so it gets the room: the
+   label read first, the shared domain behind it, the facts about it on the
+   right, and one button. The copy button used to be floated over a code box
+   with negative margins to make it sit inside the padding. */
+.addr-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.addr-main {
+  font-size: .95rem;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.addr-main:hover .addr-label { text-decoration: underline; }
+.addr-tags { display: flex; gap: 6px; margin-left: auto; flex: none; }
+.addr-card .btn { flex: none; }
+@media (max-width: 640px) {
+  .addr-card { flex-wrap: wrap; gap: 8px; }
+  .addr-tags { margin-left: 0; }
+}
 .addr { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .addr-host { text-decoration: none; white-space: nowrap; }
 .addr-label { color: var(--accent); font-weight: 600; }
