@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, sites
+from . import activity, db, incus, sites, tasks
 from .config import settings
 from .routers import admin, api, auth, client, public, terminal
 from .templating import BASE_DIR
@@ -20,6 +20,33 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
 )
 log = logging.getLogger("orion")
+
+
+def reconcile_provisions() -> int:
+    """Settle rows a restart left saying `provisioning`.
+
+    The job that owned them died with the panel, so nothing will ever write
+    them again: the instance shows a loader that cannot finish, reports itself
+    as not running, gives no live figure and keeps its vCPU out of the sellable
+    pool. The daemon is the authority on what is actually there — which is why
+    this runs only once it has answered.
+    """
+    settled = 0
+    for row in db.query("SELECT * FROM instances WHERE status = 'provisioning'"):
+        job = tasks.latest_for_instance(row["id"])
+        if job and job["status"] in ("queued", "running"):
+            continue                      # a live job still owns this row
+        try:
+            state = incus.state(row["incus_name"])
+        except incus.IncusError:
+            state = {}
+        status, message = tasks.settle_provisioning(state)
+        db.execute("UPDATE instances SET status = ?, error = ?, updated_at = ? WHERE id = ?",
+                   (status, message, now(), row["id"]))
+        activity.log("provisioning.reconcile", target=row["slug"],
+                     detail=f"provisionnement interrompu — statut porté à {status}")
+        settled += 1
+    return settled
 
 
 @asynccontextmanager
@@ -38,6 +65,13 @@ async def lifespan(app: FastAPI):
             db.set_setting("host_first_seen", now())
     else:
         log.warning("Incus unreachable at startup: %s", info.error)
+
+    # Only once the daemon has answered: with it silent, every stuck row would
+    # look like an interrupted provision and be marked in error.
+    if info.reachable:
+        settled = reconcile_provisions()
+        if settled:
+            log.info("settled %d interrupted provisioning row(s)", settled)
 
     ok, message = sites.sync_caddy()
     log.info("tenant routing: %s (%s)", "applied" if ok else "failed", message)

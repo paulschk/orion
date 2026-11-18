@@ -60,6 +60,9 @@
         <h1>{% block heading %}{{ app_name }}{% endblock %}</h1>
         <div class="topbar-sub">{% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting</span>{% endblock %}</div>
       </div>
+      {# Le prototype montre, entre le titre et les actions, les trois chiffres
+         qui situent la machine ouverte. #}
+      {% block readout %}{% endblock %}
       <div class="topbar-actions">
         {% block actions %}{% endblock %}
       </div>

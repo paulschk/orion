@@ -11,6 +11,16 @@
   <a class="btn btn-sm" href="#terminal">Console</a>
 {% endblock %}
 
+{# Ce que le prototype met entre le titre et les actions : les trois chiffres
+   qui situent la machine ouverte, sans avoir à descendre dans la page. #}
+{% block readout %}
+  <div class="readout">
+    <span>{{ instance['container_ip'] or '—' }}</span>
+    <span>SSH {{ instance['ssh_port'] or '—' }}</span>
+    <span>{{ plan['disk_gb'] if plan else '—' }} Go</span>
+  </div>
+{% endblock %}
+
 {% block content %}
 
 {# Le bandeau remplace la carte « État » : il prend toute la largeur, porte
@@ -57,11 +67,11 @@
 
   <div class="band-row">
     <div class="kv-inline">
-      <div><span class="k">Offre</span><span class="v">{{ instance['plan_name'] or '—' }}</span></div>
+      <div><span class="k">Offre</span><span class="v">{% if plan %}{{ plan['name'] }} · {{ plan['vcpu'] }} vCPU / {{ plan['memory_mb']|human_mb }}{% else %}—{% endif %}</span></div>
       <div><span class="k">Modèle</span><span class="v"><span class="pill">{{ instance['template'] }}</span></span></div>
       <div><span class="k">Adresse interne</span><span class="v mono">{{ instance['container_ip'] or '—' }}</span></div>
-      <div><span class="k">Créée le</span><span class="v mono">{{ instance['created_at'][:10] }}</span></div>
-      <div><span class="k">Renouvellement</span><span class="v mono">{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</span></div>
+      <div><span class="k">Créée le</span><span class="v">{{ instance['created_at'][:10] }}</span></div>
+      <div><span class="k">Renouvellement</span><span class="v">{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</span></div>
     </div>
   </div>
 
@@ -77,7 +87,7 @@
   </div>
 
   <div class="band-row">
-    <span class="band-note">Utilisation rapportée aux ressources de cette instance.</span>
+    <span class="tiny dim">Utilisation rapportée aux ressources de cette instance.</span>
   </div>
 </section>
 
@@ -85,7 +95,7 @@
 
   {# La coquille et le portail sont les deux entrées de l'instance : ils se font
      face, plutôt qu'aux deux bouts de la page. #}
-  <section class="tile span8" id="terminal">
+  <section class="tile span8">
     <div class="tile-h">
       <h2>Terminal</h2>
       <span class="sub" id="terminal-status"></span>
@@ -115,11 +125,13 @@
           <dt>Utilisateur</dt><dd class="mono">{{ instance['ssh_user'] }}</dd>
         </dl>
         {% if ssh_config %}
-        <div>
-          <div class="tiny dim">Entrée ~/.ssh/config — plus de port à retenir</div>
-          <div class="codebox">{{ ssh_config }}<button class="btn btn-sm btn-ghost"
+        {# Repliée par défaut : c'est du référencement, on ne le lit qu'une fois,
+           et la commande de connexion juste au-dessus suffit à se connecter. #}
+        <details class="inline-edit">
+          <summary>Entrée ~/.ssh/config — plus de port à retenir</summary>
+          <div class="codebox mt2">{{ ssh_config }}<button class="btn btn-sm btn-ghost"
                 data-copy="{{ ssh_config }}">Copier</button></div>
-        </div>
+        </details>
         {% endif %}
       </div>
       {% if not user['ssh_public_key'] and instance['initial_password'] %}
@@ -180,7 +192,7 @@
     </div>
   </section>
 
-  <section class="tile span7">
+  <section class="tile span7 fill">
     <div class="tile-h">
       <h2>Journal de provisionnement</h2>
       <span class="sub mono">{{ job['status'] if job else '—' }}</span>

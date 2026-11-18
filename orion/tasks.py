@@ -70,6 +70,21 @@ def set_progress(job_id: int, progress: int, step: str = "") -> None:
                (max(0, min(100, int(progress))), step[:120], job_id))
 
 
+def settle_provisioning(state) -> tuple[str, str]:
+    """The status a stuck `provisioning` row should carry, given the daemon.
+
+    Pure, so the decision is testable without a daemon. An empty state means
+    the container is not there at all, which is the interrupted case: the job
+    died with the panel and nothing will ever finish it. A container that is
+    up and running means the provision did finish, whatever the row says.
+    """
+    if not state:
+        return "error", "Provisionnement interrompu : le conteneur n'existe pas."
+    if (state.get("status") or "").lower() == "running":
+        return "running", ""
+    return "stopped", ""
+
+
 def latest_for_instance(instance_id: int):
     return db.one(
         "SELECT * FROM jobs WHERE instance_id = ? ORDER BY id DESC LIMIT 1", (instance_id,))

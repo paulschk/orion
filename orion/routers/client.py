@@ -123,11 +123,10 @@ def instance_context(instance, *, deep: bool = True) -> dict:
             snapshot_rows = incus.snapshots(instance["incus_name"])
         except IncusError:
             pass
-    plan_memory = ""
+    plan = None
     if instance["plan_id"]:
-        row = db.one("SELECT memory_mb FROM plans WHERE id = ?", (instance["plan_id"],))
-        if row:
-            plan_memory = f"{row['memory_mb']} MB"
+        plan = db.one("SELECT name, vcpu, memory_mb, disk_gb FROM plans WHERE id = ?",
+                      (instance["plan_id"],))
 
     job = tasks.latest_for_instance(instance["id"])
     return {
@@ -135,9 +134,10 @@ def instance_context(instance, *, deep: bool = True) -> dict:
         # l'interrogation de chaque port, le fragment de la liste s'en charge.
         **_address_rows(instance),
         "instance": instance,
+        "plan": plan,
         "metrics": figures,
         "live_status": live_status,
-        "memory_cap": plan_memory,
+        "memory_cap": f"{plan['memory_mb']} MB" if plan else "",
         "snapshots": snapshot_rows,
         "steps": _job_steps(job),
         "job": job,

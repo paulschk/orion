@@ -9,7 +9,13 @@
  */
 (function () {
   const pane = document.getElementById('terminal');
-  if (!pane || !window.Terminal) return;
+  // The pane, not just something called `terminal`: a page that carries the id
+  // twice - the tile and the pane - hands back whichever comes first, and every
+  // read below then answers for the wrong element. That is not a small mistake:
+  // `pane.dataset.state` came back empty, the module took the "not running"
+  // branch, and the exception it raised there ended the script before the
+  // keyboard handler and the sizing were ever installed.
+  if (!pane || !pane.classList.contains('term-pane') || !window.Terminal) return;
 
   const statusEl = document.getElementById('terminal-status');
   const setStatus = (text, tone) => {
@@ -49,6 +55,14 @@
   term.open(pane);
   // Reachable from the console: measuring scroll behaviour needs the instance.
   window.orionTerm = term;
+
+  // Declared before anything can call the function that uses them:
+  // `fitToWholeRows` is a hoisted declaration, but these are `const`s, and a
+  // call arriving early - the "not running" branch, a ResizeObserver's first
+  // callback - would hit the temporal dead zone and end the whole script.
+  const TARGET_HEIGHT = 460;
+  const BASE_PAD = 8;      // the stylesheet's own bottom padding
+  const EXTRA_ROWS = 3;    // rows of clearance kept under the last line
 
   const state = pane.dataset.state || '';
   if (state !== 'running') {
@@ -203,15 +217,14 @@
   // about to write turns this into a loop that takes a row off on every pass:
   // the pane ends up 2px short (the borders), the next measurement no longer
   // fits the last row, and the terminal folds itself away a line at a time.
-  const TARGET_HEIGHT = 460;
-  const BASE_PAD = 8;      // the stylesheet's own bottom padding
+  // TARGET_HEIGHT and BASE_PAD are declared at the top of this module, so that
+  // a call arriving before this point cannot find them uninitialised.
   // A few rows of clearance under the last line. The prompt lives on the final
   // row of the screen, and with the pane snapped flush to that row it sat
   // against the pane's bottom edge - which reads as though it were falling out
   // of the window, and is impossible to see when the pane's foot is at the
   // window's foot. Three rows lift it clear without giving up a single line of
   // scrollback.
-  const EXTRA_ROWS = 3;
   // `fixed` deliberately does not read padding-bottom: that is the value this
   // function writes, so feeding it back is the loop that folds the pane.
   function fitToWholeRows() {
@@ -224,12 +237,22 @@
     const fixed = ['paddingTop', 'borderTopWidth', 'borderBottomWidth']
       .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
 
-    const cell = term.rows > 0 ? screen.getBoundingClientRect().height / term.rows : 0;
-    if (!cell) { fit.fit(); return; }
+    const before = screen.getBoundingClientRect();
+    // Both dimensions are measured from what the renderer actually produced:
+    // the screen is exactly cols x cell wide and rows x cell high, so the ratios
+    // give the cell. FitAddon's own proposal returns nothing in this build -
+    // which is why the terminal sat at xterm's default 80x24 with half the pane
+    // empty, whatever the window size.
+    const cellH = term.rows > 0 ? before.height / term.rows : 0;
+    const cellW = term.cols > 0 ? before.width / term.cols : 0;
+    if (!cellH || !cellW) { fit.fit(); return; }
 
-    const proposal = fit.proposeDimensions && fit.proposeDimensions();
-    const cols = (proposal && proposal.cols) || term.cols;
-    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - fixed) / cell));
+    // clientWidth already excludes the borders, so only the padding comes off
+    // the usable width.
+    const usable = pane.clientWidth - (parseFloat(style.paddingLeft) || 0)
+      - (parseFloat(style.paddingRight) || 0);
+    const cols = Math.max(20, Math.floor(usable / cellW));
+    const rows = Math.max(2, Math.floor((TARGET_HEIGHT - fixed) / cellH));
 
     if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
 
@@ -251,7 +274,7 @@
     // reserved inside `.xterm` puts the foot of the scrollable area below the
     // last line of text - the wheel keeps scrolling past the end of the output
     // and the viewport no longer ends where the terminal does.
-    const padBottom = BASE_PAD + EXTRA_ROWS * cell;
+    const padBottom = BASE_PAD + EXTRA_ROWS * cellH;
     if (pane.style.paddingBottom !== padBottom + 'px') pane.style.paddingBottom = padBottom + 'px';
 
     // Not rounded: a whole-pixel container around a fractional screen is exactly
