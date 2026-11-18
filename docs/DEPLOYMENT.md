@@ -86,9 +86,11 @@ hosting.node29.fr.          A   <host address>
 ```
 
 Both records DNS-only. Point them wherever "reachable by your clients" means:
-the LAN address, or the host's Tailscale address to make the panel genuinely
-tailnet-only (the Caddy block already returns 403 to anything outside
-`192.168.1.0/24` and `100.64.0.0/10`).
+the LAN address, or the host's Tailscale address. The reference block returns 403
+to anything outside the LAN for the panel's own hostname — add your tailnet range
+to its `@external` matcher if the panel should be reachable that way too. Keep the
+gate inside a `handle` block: a site-level `respond` is reordered after the
+`handle`s and never runs.
 
 ## 6. First login
 

@@ -190,9 +190,11 @@ docker exec caddy caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfi
 ```
 
 The reference block sends the apex to the panel and every subdomain to the
-tenant router, and **restricts both to the LAN and the tailnet** — delete the
-two `@external` lines to expose the panel publicly, and read
-[Security](#security-posture) first.
+tenant router, and **restricts the apex to the LAN** — the tenant wildcard is a
+block of its own, since those are the clients' sites. Delete the
+`handle @external` block to expose the panel, and read
+[Security](#security-posture) first. The gate must stay inside a `handle`: a
+site-level `respond` is reordered after the `handle`s and never runs at all.
 
 #### 6. Point DNS at the host
 
@@ -312,7 +314,8 @@ Stated plainly, because a hosting panel is a high-value target:
   nothing else — not the LAN, not the tailnet, not each other, not the host's
   own services.
 - **The panel is not exposed by default.** The reference Caddy block answers
-  `403` to anything outside the LAN and the tailnet.
+  `403` to anything outside the LAN — and the gate has to sit in a `handle`
+  block, because a site-level `respond` is reordered after them and never runs.
 - **Login has no rate limiting yet.** Do not expose the panel to the internet
   before that is added.
 - **Stored initial instance passwords are plaintext**, by design, so the panel

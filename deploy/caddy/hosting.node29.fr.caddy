@@ -1,29 +1,50 @@
 # --- Orion hosting panel -----------------------------------------------------
 # Append this block to the edge Caddyfile (/srv/caddy/Caddyfile) and reload:
-#   docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+#   docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+#   docker exec caddy caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfile
 #
-# Reachable from the LAN and the tailnet only; 403 for everything else. Pair it
-# with an A record for hosting.node29.fr and *.hosting.node29.fr pointing at
-# this host, so the names resolve but stay unreachable from the open internet.
+# The apex serves the panel and its presentation pages, and answers 403 to
+# everything outside the LAN. Every subdomain is a tenant website, routed by the
+# dedicated tenant Caddy that Orion configures over its admin API — those are the
+# clients' sites, so they are their own block and are not gated.
 #
-# The apex serves the panel. Every subdomain is a tenant website, routed by the
-# dedicated tenant Caddy that Orion configures over its admin API.
+# Pair it with an A record for hosting.node29.fr and *.hosting.node29.fr pointing
+# at this host, so the names resolve.
+#
+# The gate is a `handle` block, not a site-level `respond`, and that is not a
+# matter of style. Caddy sorts a site's directives by its own default order,
+# which puts the `handle` blocks first; the first `handle` that matches is
+# terminal, so a `respond` written above them runs *after* one has already
+# answered — that is, never. Written that way the gate sits in the running
+# config, looks right on every reading, and does nothing at all: the panel
+# answers the open internet. `handle` blocks are evaluated in the order written,
+# so the gate goes first, inside one.
+#
+# Measured on the panel before the fix: five nodes from five different networks
+# received 200 on /healthz. After it: five received 403, and the LAN kept 200.
 
-hosting.node29.fr, *.hosting.node29.fr {
-	@external not remote_ip 192.168.1.0/24 100.64.0.0/10
-	respond @external 403
+hosting.node29.fr {
+	@external not remote_ip 192.168.1.0/24
+	handle @external {
+		respond 403
+	}
 
-	# Panel (apex).
-	@panel host hosting.node29.fr
-	handle @panel {
+	handle {
 		reverse_proxy orion:8000
 	}
 
-	# Tenant websites (any subdomain). orion-caddy joins the shared "gpi"
-	# network so this name resolves.
-	handle {
-		reverse_proxy orion-caddy:8080
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer-when-downgrade"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
 	}
+}
+
+*.hosting.node29.fr {
+	reverse_proxy orion-caddy:8080
 
 	encode gzip
 	header {

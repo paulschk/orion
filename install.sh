@@ -187,9 +187,10 @@ cat <<NEXT
         $DIR/deploy/caddy/hosting.node29.fr.caddy
       and reload that Caddy:
         docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
-      It sends the apex to the panel and every subdomain to the tenant router,
-      and answers 403 to anything outside the LAN and the tailnet - remove the
-      two @external lines to expose the panel to the internet.
+      It sends the apex to the panel and every subdomain to the tenant router.
+      The apex answers 403 to anything outside the LAN; the tenant wildcard is a
+      block of its own, because those are the clients' sites and are meant to be
+      seen. Delete the `handle @external` block to expose the panel.
 
    2. DNS. Two A records, DNS-only (grey cloud) at Cloudflare, pointing at this
       host's public address - the wildcard is what gives every tenant site a

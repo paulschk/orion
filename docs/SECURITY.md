@@ -24,8 +24,12 @@ threat model to match.
 * **Audit trail** — authentication, provisioning, power actions, snapshots,
   console commands, site changes, plan edits and invoice transitions all land in
   `activity` with actor and source IP.
-* **Exposure** — the panel and all tenant sites are gated to the LAN and the
-  tailnet by the edge Caddy; anything else gets 403.
+* **Exposure** — the panel's own hostname is gated to the LAN by the edge Caddy;
+  anything else gets 403. The tenant wildcard is deliberately *not* gated: those
+  are the clients' sites. The gate lives inside a `handle` block because a
+  site-level `respond` is reordered after the `handle`s by Caddy's default
+  directive order and never runs — measured before that fix, the panel answered
+  `/healthz` to the open internet from five different networks.
 * **Tenant isolation** — CPU, memory and disk are enforced by cgroups and btrfs
   qgroups. There is no overcommit by default; creation is refused when the host
   cannot carry the plan.
