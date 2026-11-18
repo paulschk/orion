@@ -275,12 +275,12 @@ details summary:hover{color:var(--ink)}
 
 /* ---------------------------------- le bandeau, à la demande du propriétaire */
 /* Le bandeau est une section, comme celles du site public : il ne prend aucune
-   respiration de la règle `section`. Il n'a plus de padding en haut — la
-   demande du propriétaire — et garde 24 px sur les côtés et 9 px en bas, sur
-   l'en-tête comme sur chaque rangée. */
+   respiration de la règle `section`. Il garde la sienne : 13 px en haut sur
+   l'en-tête, 24 px sur les côtés, 9 px en bas — et les rangées se suivent avec
+   un léger intervalle de 8 px. */
 .band{padding:0}
-.band-head,.band-row{padding:0 24px 9px}
-.band-row + .band-row{padding-top:0}
+.band-head{padding:13px 24px 9px}
+.band-row{padding:8px 24px 9px}
 
 /* -------------------------------------------------------- utilitaires en plus */
 .right{text-align:right}
