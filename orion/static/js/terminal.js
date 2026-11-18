@@ -31,6 +31,11 @@
       });
       document.addEventListener('fullscreenchange', function () {
         fsButton.textContent = document.fullscreenElement === pane ? 'Quitter' : 'Plein écran';
+        // Ne pas s'en remettre à l'événement du navigateur pour le
+        // redimensionnement : on recalcule ici, dans la frame qui suit, quand le
+        // nouveau cadre est en place. Le calcul lit lui-même l'état plein écran,
+        // donc `fitToWholeRows` fait ce qu'il faut dans les deux sens.
+        requestAnimationFrame(fitToWholeRows);
       });
     }
   }
