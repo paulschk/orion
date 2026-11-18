@@ -244,10 +244,11 @@ details summary:hover{color:var(--ink)}
    montre pas (alertes, chargement, coquille publique, tiroir mobile) et les
    corrections du terminal, écrites dans le même registre — mêmes jetons,
    mêmes filets d'un pixel, mêmes angles à 3 px, mêmes libellés en monospace
-   capitales. Aucune règle ici ne redéfinit un sélecteur du prototype, à une
-   exception près, signalée : `.term-pane`, dont la hauteur est un correctif
-   mesuré (le prototype montre 300 px, le terminal se cale sur des rangées
-   entières).
+   capitales. Aucune règle ici ne redéfinit un sélecteur du prototype, à deux
+   exceptions près, signalées sur place : `.term-pane`, dont la hauteur est un
+   correctif mesuré (le prototype montre 300 px, le terminal se cale sur des
+   rangées entières), et le bandeau, dont le propriétaire a demandé qu'il soit
+   posé à ras — sans respiration en haut ni en bas.
 
    Les noms de jetons du prototype sont la source : les noms hérités du
    panneau (`--border`, `--text`, `--text-dim`…) sont des alias, déclarés dans
@@ -271,6 +272,17 @@ details summary:hover{color:var(--ink)}
   src:url('/static/fonts/inter-latin.woff2') format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:swap;
   src:url('/static/fonts/jetbrains-mono-latin.woff2') format('woff2')}
+
+/* ---------------------------------- le bandeau, à la demande du propriétaire */
+/* Le prototype respire de 13 px au-dessus de son titre et de 13 px sous sa
+   dernière rangée. Retiré : les rangées gardent leur filet et leur padding haut
+   pour se séparer les unes des autres, mais le bandeau touche désormais le haut
+   et le bas. */
+.band-head{padding-top:0}
+.band-row{padding-bottom:0}
+/* Le bandeau est une section, comme celles du site public : il ne prend aucune
+   respiration, ni la sienne ni celle qu'une autre règle lui prêterait. */
+.band{padding:0}
 
 /* -------------------------------------------------------- utilitaires en plus */
 .right{text-align:right}
@@ -516,8 +528,12 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(1){top:6px;transform:rotate(45deg)}
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(2){opacity:0}
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(3){top:6px;transform:rotate(-45deg)}
-section{padding:64px 0}
-section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+/* `#main >` : le site public pose ses sections directement dans <main>, le
+   panneau a les siennes — `.band` et `.tile`. Sans ce garde-fou, une règle de
+   mise en page du site public atteignait le bandeau du panneau et lui donnait
+   64 px de respiration en haut et en bas. */
+#main > section{padding:64px 0}
+#main > section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .hero h1{font-size:2.35rem;max-width:780px;margin-bottom:16px}
 .hero .lead{font-size:1.08rem;color:var(--muted);max-width:620px;margin-bottom:26px}
 .hero .eyebrow{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
@@ -595,6 +611,7 @@ section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bot
   .content > .card,.content > .alert,.content > .empty,.content > .stack,
   .content > .table-wrap,#flash > .alert{margin-left:14px;margin-right:14px}
   .content-row{padding:12px 14px 0}
+  #main > section{padding:48px 0}
 }
 @media (max-width:720px){
   .pnav .nav-toggle{display:block}
