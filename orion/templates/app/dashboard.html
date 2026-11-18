@@ -30,8 +30,10 @@
     {% for name in rows|map(attribute='plan_name')|select|unique|list %}
     <span class="badge idle">{{ name }}</span>
     {% endfor %}
-    <span class="badge">{{ domain }}</span>
-    <span class="tiny dim mono push">Prochain renouvellement : {{ renew[:10] if renew else '—' }}</span>
+    {# L'offre et la date sur la même ligne : le `push` repoussait la date à
+       l'autre bout, et la marque du panneau n'a rien à faire ici — le client est
+       déjà chez lui. #}
+    <span class="tiny dim mono">Prochain renouvellement : {{ renew[:10] if renew else '—' }}</span>
   </div>
 
   {# Plus de barres d'utilisation : la mémoire et le stockage se lisent dans les

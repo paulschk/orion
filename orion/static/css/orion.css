@@ -643,7 +643,11 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
   /* Le tiroir reprend la colonne telle qu'elle est sur grand écran : les règles
      mobiles du prototype (barre horizontale, libellés de section masqués,
      marque en bandeau) ne s'appliquent pas ici, c'est un panneau qui glisse. */
-  .side{position:fixed;top:0;left:0;bottom:0;height:100vh;width:min(280px,84vw);z-index:80;
+  /* `100vh` sur un téléphone vaut la fenêtre *grande* : celle qui inclut la zone
+     derrière la barre d'URL, justement là où tombait le pied du tiroir. Sous
+     Firefox et Safari mobiles, la partie basse restait donc invisible, et aucune
+     hauteur interne ne pouvait la rattraper. `dvh` suit la fenêtre visible. */
+  .side{position:fixed;top:0;left:0;height:100vh;height:100dvh;width:min(280px,84vw);z-index:80;
     transform:translateX(-100%);transition:transform .22s cubic-bezier(.22,.61,.36,1);
     box-shadow:0 0 40px rgba(0,0,0,.5);overflow:hidden;flex-direction:column;flex-wrap:nowrap;
     border-right:1px solid var(--line);border-bottom:0;padding:16px 12px}
