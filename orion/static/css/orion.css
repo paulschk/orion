@@ -648,12 +648,10 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
    l'intention aux navigateurs qui la comprennent. */
 html{overflow-y:scroll;scrollbar-gutter:stable}
 
-/* Passer du site de présentation à l'espace client — et l'inverse, et la
-   connexion — est une navigation entre documents : le navigateur sait fondre
-   l'une dans l'autre quand on le lui demande, sans script et sans rien changer
-   d'autre. L'opt-in est dans l'en-tête des deux coquilles, et la règle est ici,
-   à la racine de la feuille — c'est là qu'elle doit être pour être lue. */
-@view-transition{navigation:auto}
+/* La transition entre documents est déclarée plus haut, avec les animations
+   d'htmx : ce qui manquait n'était pas la règle mais l'opt-in, le
+   `<meta name="view-transition" content="same-origin">` posé dans l'en-tête des
+   deux coquilles. Sans lui le navigateur n'anime rien, même avec la règle. */
 
 /* -------------------------------------------------- le tiroir, sous 900 px */
 /* Le prototype replie sa colonne en barre horizontale sous 900 px ; ce panneau
