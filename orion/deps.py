@@ -22,6 +22,13 @@ def require_user(request: Request):
     session = session_optional(request)
     if session is None:
         target = request.url.path
+        # Une requête htmx ne doit pas voir la page de connexion atterrir dans la
+        # coquille du panneau : htmx suivrait un 303 et remplacerait la cible du
+        # swap par la page publique. `HX-Redirect` demande au navigateur une
+        # vraie navigation, ce qui est le comportement voulu. C'est le seul
+        # endroit où le panneau renvoie hors de sa propre coquille.
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=200, headers={"HX-Redirect": f"/login?next={target}"})
         raise HTTPException(status_code=303, headers={"Location": f"/login?next={target}"})
     return session
 
