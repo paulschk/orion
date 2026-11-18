@@ -43,7 +43,10 @@ class NoThirdPartyClassClash(unittest.TestCase):
 
     def test_the_log_block_and_its_rule_agree_on_the_name(self):
         css = (ROOT / "orion" / "static" / "css" / "orion.css").read_text()
-        self.assertIn(".job-log {", css)
+        # The rule, not its formatting: the stylesheet is written tight (`.job-log{`),
+        # and a test that pins the space before the brace fails on a reformat
+        # rather than on the thing it is meant to guard.
+        self.assertRegex(css, r"\.job-log\s*\{")
         users = [p for p in (ROOT / "orion" / "templates").rglob("*.html")
                  if 'class="job-log"' in p.read_text()]
         self.assertGreaterEqual(len(users), 2, "le bloc de journal a perdu sa classe")
