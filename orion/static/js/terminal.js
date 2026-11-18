@@ -261,13 +261,19 @@
       .reduce(function (total, key) { return total + (parseFloat(style[key]) || 0); }, 0);
 
     const before = screen.getBoundingClientRect();
-    // Both dimensions are measured from what the renderer actually produced:
-    // the screen is exactly cols x cell wide and rows x cell high, so the ratios
-    // give the cell. FitAddon's own proposal returns nothing in this build -
-    // which is why the terminal sat at xterm's default 80x24 with half the pane
-    // empty, whatever the window size.
-    const cellH = term.rows > 0 ? before.height / term.rows : 0;
-    const cellW = term.cols > 0 ? before.width / term.cols : 0;
+    // Both dimensions are measured from what the renderer actually produced.
+    //
+    // Sauf que la boîte de l'écran vaut la hauteur *visible* dès que le panneau
+    // est plus court que son contenu : la cellule qu'on en déduit sort alors trop
+    // petite, on demande trop de rangées, et le débord apparaît dès que le
+    // navigateur impose la hauteur du panneau — c'est le cas en plein écran.
+    // Le moteur, lui, connaît la cellule indépendamment du cadre ; c'est la
+    // source, et la mesure de la boîte reste le repli si l'interne disparaît.
+    // FitAddon, de son côté, ne propose toujours rien dans ce build.
+    const engine = term._core && term._core._renderService && term._core._renderService.dimensions;
+    const engineCell = engine && engine.css && engine.css.cell ? engine.css.cell : null;
+    const cellH = (engineCell && engineCell.height) || (term.rows > 0 ? before.height / term.rows : 0);
+    const cellW = (engineCell && engineCell.width) || (term.cols > 0 ? before.width / term.cols : 0);
     if (!cellH || !cellW) { fit.fit(); return; }
 
     // clientWidth already excludes the borders, so only the padding comes off
