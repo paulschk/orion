@@ -330,6 +330,12 @@ details summary:hover{color:var(--ink)}
    top of the content instead. Nothing at all when the page has none. */
 .content-actions{display:none}
 .content-actions .btn{flex:1 1 auto;justify-content:center}
+/* Le prototype donne au shell une hauteur minimale de `100vh` : sur un téléphone
+   c'est la fenêtre large, et la page gagne donc une bande de défilement vide là
+   où la barre d'URL se retire. La règle du prototype reste le repli, `dvh` la
+   remplace là où il existe. La colonne de bureau garde la sienne : elle n'a pas
+   de barre dynamique. */
+.shell{min-height:100dvh}
 .side-scrim{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.5);
   opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s}
 .side-scrim.open{opacity:1;visibility:visible}
