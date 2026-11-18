@@ -281,6 +281,10 @@ details summary:hover{color:var(--ink)}
 .band{padding:0}
 .band-head{padding:13px 24px 9px}
 .band-row{padding:8px 24px 9px}
+/* Le prototype pose 12 px sur les rangées suivantes (`.band-row + .band-row`,
+   plus spécifique) : aligné sur les 8 px, pour que l'écart soit le même partout,
+   du titre à la première rangée comme entre les rangées. */
+.band-row + .band-row{padding-top:8px}
 
 /* -------------------------------------------------------- utilitaires en plus */
 .right{text-align:right}
