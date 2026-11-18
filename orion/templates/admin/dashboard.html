@@ -37,7 +37,7 @@
   <div class="band-row">
     <div class="gauges">
       <div class="gauge {{ 'attn' if cpu_pct >= 70 }}">
-        <div class="gauge-h"><span class="lbl">vCPU</span><span class="val">{{ alloc.vcpu }} / {{ info.sellable_vcpu }}</span></div>
+        <div class="gauge-h"><span class="lbl">Processeur</span><span class="val">{{ alloc.vcpu }} / {{ info.sellable_vcpu }}</span></div>
         <div class="bar {{ 'bad' if cpu_pct > 90 else ('warn' if cpu_pct > 70 else '') }}"><span style="width:{{ [cpu_pct, 100]|min }}%"></span></div>
         <div class="note">{{ info.reserve_vcpu }} vCPU réservé au système</div>
       </div>
@@ -47,7 +47,7 @@
         <div class="note">{{ info.ram_total_mb|human_mb }} au total, {{ info.reserve_ram_mb|human_mb }} réservés</div>
       </div>
       <div class="gauge {{ 'attn' if disk_pct >= 70 }}">
-        <div class="gauge-h"><span class="lbl">Disque</span><span class="val">{{ alloc.disk_gb }} / {{ info.sellable_disk_gb }} GB</span></div>
+        <div class="gauge-h"><span class="lbl">Stockage</span><span class="val">{{ alloc.disk_gb }} / {{ info.sellable_disk_gb }} GB</span></div>
         <div class="bar {{ 'bad' if disk_pct > 90 else ('warn' if disk_pct > 70 else '') }}"><span style="width:{{ [disk_pct, 100]|min }}%"></span></div>
         <div class="note">pool {{ info.pool_name }} · {{ info.pool_total_gb }} GB</div>
       </div>
