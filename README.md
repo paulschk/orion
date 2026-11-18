@@ -82,7 +82,36 @@ More detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Installation
 
-### 1. Prepare the host
+### One command
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/paulschk/orion/main/install.sh | sudo bash -s -- \
+  --domain hosting.example.com --admin you@example.com
+```
+
+It fetches the source into `/opt/orion`, prepares the host, writes a `.env` with
+a generated secret key and a generated admin password (printed once at the end),
+starts the panel, and then tells you the two things it will not guess: the edge
+Caddy block and the two DNS records. Nothing is overwritten — an existing `.env`
+is left alone, and a target directory that is not a git checkout is refused
+rather than clobbered.
+
+| Option | |
+|---|---|
+| `--domain HOST` | Panel hostname. Prompted if absent. |
+| `--admin EMAIL` | The first admin account. Prompted if absent. |
+| `--ingress-ip IP` | Public address clients point their own domains at; detected if absent. |
+| `--admin-password PWD` | Generates one if absent. |
+| `--dir PATH` · `--network NAME` | Default `/opt/orion` and `gpi`. |
+| `--update` | Update an installation already in place. |
+| `--dry-run` | Print every action, change nothing. |
+| `--yes` | Never prompt. |
+
+### Or by hand, step by step
+
+The installer runs steps 1–4 below and prints steps 5–6 for you.
+
+#### 1. Prepare the host
 
 ```bash
 git clone git@github.com:paulschk/orion.git
@@ -107,7 +136,7 @@ The script is idempotent and safe to re-run. It:
 Overridable with `ORION_POOL`, `ORION_POOL_SIZE`, `ORION_POOL_FILE`,
 `ORION_BRIDGE` and `ORION_BRIDGE_CIDR`.
 
-### 2. Create the network the panel joins
+#### 2. Create the network the panel joins
 
 The panel and the edge Caddy share a Docker network so they can reach each other
 by name:
@@ -118,7 +147,7 @@ docker network create gpi
 
 (Name and existence are declared in `docker/docker-compose.yaml`.)
 
-### 3. Configure the panel
+#### 3. Configure the panel
 
 ```bash
 cp docker/.env.example docker/.env
@@ -138,7 +167,7 @@ At minimum, set these five:
 Everything else has a working default; the full list is in
 [Configuration](#configuration).
 
-### 4. Start it
+#### 4. Start it
 
 ```bash
 ./deploy/deploy.sh
@@ -148,7 +177,7 @@ It checks `.env`, creates `docker/data` and `docker/caddy`, seeds a valid
 bootstrap config for the tenant router, then builds and starts both containers.
 The panel listens on the internal network only — it is never published directly.
 
-### 5. Put it behind TLS
+#### 5. Put it behind TLS
 
 Append the block from
 [`deploy/caddy/hosting.node29.fr.caddy`](deploy/caddy/hosting.node29.fr.caddy)
@@ -165,7 +194,7 @@ tenant router, and **restricts both to the LAN and the tailnet** — delete the
 two `@external` lines to expose the panel publicly, and read
 [Security](#security-posture) first.
 
-### 6. Point DNS at the host
+#### 6. Point DNS at the host
 
 Two records, both **DNS-only** (grey cloud) if you use Cloudflare, because the
 edge answers the ACME DNS-01 challenge itself:
@@ -178,7 +207,7 @@ edge answers the ACME DNS-01 challenge itself:
 The wildcard is what gives every tenant subdomain a certificate, and it is why
 a client can publish a site without you doing anything.
 
-### 7. Verify, then log in
+#### 7. Verify, then log in
 
 ```bash
 curl -sS https://hosting.example.com/healthz

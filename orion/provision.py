@@ -416,11 +416,34 @@ cat > /var/www/@@HOSTNAME@@/wp-content/mu-plugins/00-orion-proxy.php <<'ORION_MU
 /*
 Plugin Name: Orion proxy awareness
 Description: TLS is terminated by the edge proxy, so tell WordPress the request
-is HTTPS. Without this wp-login.php redirects to itself forever.
+is HTTPS - without this wp-login.php redirects to itself forever. And let the
+site's own address follow the request, so renaming an address in the panel takes
+effect at once instead of leaving every URL WordPress generates pointing at the
+name it used to have.
 */
 if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
     $_SERVER['HTTPS'] = 'on';
     $_SERVER['SERVER_PORT'] = 443;
+}
+
+/*
+ * WordPress keeps its own address in the database (siteurl/home). A site whose
+ * name the client can change from the panel must not depend on that row: the
+ * address is derived from the request instead, so a rename needs no database
+ * write and nothing has to be re-provisioned. Without this, wp_login_url() - and
+ * the admin, uploaded media and the REST API - keep announcing the old name.
+ *
+ * Reading HTTP_HOST is safe *here*, and only here, because of how the machine is
+ * reached: the tenant router forwards a request only when its host matches an
+ * address declared for this instance, so an arbitrary Host header never arrives.
+ * Do not reuse this where that is not true.
+ */
+$orion_host = $_SERVER['HTTP_HOST'] ?? '';
+if ($orion_host !== '' && preg_match('/^[a-z0-9.-]+(:\d+)?\z/i', $orion_host)) {
+    $orion_scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $orion_base = $orion_scheme . '://' . $orion_host;
+    add_filter('pre_option_home', function () use ($orion_base) { return $orion_base; });
+    add_filter('pre_option_siteurl', function () use ($orion_base) { return $orion_base; });
 }
 ORION_MU
 chown www-data:www-data /var/www/@@HOSTNAME@@/wp-content/mu-plugins/00-orion-proxy.php
