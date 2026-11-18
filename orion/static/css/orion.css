@@ -290,9 +290,6 @@ details summary:hover{color:var(--ink)}
 .right{text-align:right}
 .center{text-align:center}
 .nowrap{white-space:nowrap}
-/* L'offre et son étiquette de modèle sur la même ligne de base, dans une cellule
-   de tableau. */
-.cell-row{display:inline-flex;align-items:center}
 .push{margin-left:auto}
 .mt0{margin-top:0}
 .mb1{margin-bottom:8px}
@@ -489,19 +486,6 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
 /* -------------------------------------------------- liste d'adresses en plus */
 .addr-who{min-width:0}
 .addr-main:hover .addr-label{text-decoration:underline}
-
-/* ------------------------------------ les camemberts du tableau de bord */
-/* Le prototype n'en montre pas ; le registre est le sien — la part pleine à
-   l'accent, le reste en filet, les chiffres en monospace dessous. Une part
-   au-dessus de 70 % prend l'ambre du « à surveiller », le même vocabulaire que
-   les jauges du bandeau. */
-.pies{display:flex;gap:36px;flex-wrap:wrap}
-.pie-block{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-.pie{width:72px;height:72px;border-radius:50%;flex:none;
-  background:conic-gradient(var(--accent) calc(var(--pct, 0) * 1%), var(--line-soft) 0)}
-.pie.attn{background:conic-gradient(var(--warn) calc(var(--pct, 0) * 1%), var(--line-soft) 0)}
-.pie-fig{font-family:var(--mono);font-size:12px}
-.pie-note{font-size:11px;color:var(--dim)}
 
 /* ------------------------------------------------------------ site public */
 /* La maquette ne porte pas de site public : ces règles-là reprennent la mise en

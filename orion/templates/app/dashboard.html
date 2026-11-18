@@ -34,24 +34,30 @@
   </div>
 
   <div class="band-row">
-    {# Mémoire et stockage en camemberts, leurs chiffres en dessous. Le processeur
-       n'en a pas : il n'a pas de « loué » auquel se rapporter, et le tableau de
-       bord n'a pas à inventer un pourcentage. Les barres d'utilisation ont
-       disparu avec. #}
-    <div class="pies">
-      <div class="pie-block">
-        <div class="pie {{ 'attn' if usage.ram_pct >= 70 }}" style="--pct:{{ [usage.ram_pct, 100]|min }}"
-             role="img" aria-label="Mémoire : {{ usage.ram_pct }} % utilisés"></div>
-        <div class="lbl">Mémoire</div>
-        <div class="pie-fig">{{ usage.ram_used_mb|human_mb }} sur {{ usage.ram_rented_mb|human_mb }}</div>
-        <div class="pie-note">{{ usage.ram_free_mb|human_mb }} libres</div>
+    <div class="gauges">
+      {# Processeur, mémoire, stockage : le même ordre que le bandeau d'une
+         instance, pour que les trois grandeurs se lisent au même endroit d'une
+         page à l'autre. A reading needs two samples of the daemon's cumulative
+         counter, so the first view of a fresh process has no CPU figure yet:
+         say that rather than drawing a machine at rest. #}
+      {% set cpu = usage.cpu_pct %}
+      <div class="gauge {{ 'attn' if cpu is not none and cpu >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Processeur</span><span class="val">{% if cpu is not none %}{{ cpu }} %{% else %}—{% endif %}</span></div>
+        <div class="bar {{ 'bad' if cpu is not none and cpu > 90 else ('warn' if cpu is not none and cpu > 70 else ('ok' if cpu is not none else '')) }}"><span style="width:{{ cpu if cpu is not none else 0 }}%"></span></div>
+        <div class="note">
+          {% if cpu is not none %}Moyenne de vos {{ usage.running }} instance{{ 's' if usage.running > 1 }} en ligne
+          {% else %}Calcul en cours — la mesure se fait entre deux lectures.{% endif %}
+        </div>
       </div>
-      <div class="pie-block">
-        <div class="pie {{ 'attn' if usage.disk_pct >= 70 }}" style="--pct:{{ [usage.disk_pct, 100]|min }}"
-             role="img" aria-label="Stockage : {{ usage.disk_pct }} % utilisés"></div>
-        <div class="lbl">Stockage</div>
-        <div class="pie-fig">{{ usage.disk_used_gb }} sur {{ usage.disk_rented_gb }} Go</div>
-        <div class="pie-note">{{ usage.disk_free_gb }} Go libres</div>
+      <div class="gauge {{ 'attn' if usage.ram_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Mémoire</span><span class="val">{{ usage.ram_used_mb|human_mb }} / {{ usage.ram_rented_mb|human_mb }}</span></div>
+        <div class="bar {{ 'bad' if usage.ram_pct > 90 else ('warn' if usage.ram_pct > 70 else 'ok') }}"><span style="width:{{ [usage.ram_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ usage.ram_free_mb|human_mb }} libres sur ce que vous louez</div>
+      </div>
+      <div class="gauge {{ 'attn' if usage.disk_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Stockage</span><span class="val">{{ usage.disk_used_gb }} / {{ usage.disk_rented_gb }} Go</span></div>
+        <div class="bar {{ 'bad' if usage.disk_pct > 90 else ('warn' if usage.disk_pct > 70 else 'ok') }}"><span style="width:{{ [usage.disk_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ usage.disk_free_gb }} Go libres sur ce que vous louez</div>
       </div>
     </div>
   </div>
@@ -96,12 +102,8 @@
           {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
           <tr>
             <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
-                {# L'adresse du service est elle-même le lien : c'est ce que le
-                   client ouvre, et elle existe dès la création. #}
-                <div><a class="tiny dim mono" href="https://{{ i['slug'] }}.{{ domain }}"
-                        target="_blank" rel="noopener">{{ i['slug'] }}.{{ domain }}</a></div></td>
-            <td><span class="cell-row"><span class="small">{{ i['plan_name'] or '—' }}</span>
-                <span class="slug">{{ i['template'] }}</span></span></td>
+                <div class="tiny dim mono">{{ i['slug'] }}.{{ domain }}</div></td>
+            <td class="small">{{ i['plan_name'] or '—' }} <span class="slug">{{ i['template'] }}</span></td>
             <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
             <td class="num">
               {% if i['ram_used_mb'] is not none %}{{ i['ram_used_mb']|human_mb }}
