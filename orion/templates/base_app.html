@@ -7,6 +7,9 @@
    peint du blanc le temps du trajet, et un thème sombre clignote à chaque
    ouverture. `color-scheme` donne aussi des barres et des champs sombres. #}
 <meta name="color-scheme" content="dark">
+{# L'opt-in pour la transition entre documents : aller du panneau au site de
+   présentation (et revenir) devient un fondu du navigateur, sans script. #}
+<meta name="view-transition" content="same-origin">
 <style>html{background:#0b0c10}</style>
 <title>{% block title %}{{ app_name }}{% endblock %} — {{ brand }}</title>
 <link rel="stylesheet" href="/static/css/orion.css?v={{ asset_version }}">
@@ -15,18 +18,21 @@
 <script src="/static/js/orion.js?v={{ asset_version }}" defer></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body hx-boost="true" hx-target="#shell" hx-select="#shell" hx-swap="outerHTML show:window:top">
-{# Toute la navigation du panneau passe par htmx : le document n'est plus
-   reconstruit à chaque clic, donc plus de clignotement, plus de feuille ni de
-   police à recharger, et plus de barre de défilement qui apparaît — la largeur
-   de la page ne bouge plus d'une page à l'autre.
+<body hx-boost="true">
+{# Toute la navigation du panneau passe par htmx, et par rien d'autre : `hx-boost`
+   seul, sans `hx-target` ni `hx-select` ni `hx-swap` sur le corps.
 
-   On remplace la coquille entière, colonne comprise, et c'est délibéré : le lien
-   actif et les compteurs de la colonne viennent du rendu serveur, donc garder la
-   colonne garderait un état périmé. Ce qui n'est *pas* remplacé, c'est le corps
-   du document — la région des notifications, les polices déjà chargées, la
-   barre de défilement. Le défilement de la colonne est réappliqué après coup
-   par `orion.js`, sinon le remplacement le renverrait en haut.
+   Ces trois-là se propagent aux descendants, et c'est précisément ce qu'il ne
+   faut pas : un fragment sondé — la liste d'adresses, les mesures, l'état — n'a
+   pas de cible à lui, il héritait donc de celle du corps. Le rafraîchissement
+   des adresses remplaçait la coquille entière par sa seule carte, et la page
+   apparaissait en morceaux, pleine largeur. Laissé à ses valeurs par défaut,
+   `hx-boost` remplace le corps du document pour un lien, et chaque fragment
+   remplace le sien.
+
+   Ce qui n'est pas rechargé reste ce qui compte : les polices, la feuille, la
+   barre de défilement, sa gouttière réservée. La région des notifications vit
+   sur le corps et disparaît donc à chaque remplacement ; `orion.js` la recrée.
 
    Les liens qui sortent du panneau portent `hx-boost="false"`, sinon la page
    publique viendrait s'installer dans la coquille. #}

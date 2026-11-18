@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{# Le même premier pixel sombre que le panneau — la feuille arrive après — et
+   l'opt-in pour la transition entre documents : passer du site de présentation
+   à l'espace client devient un fondu du navigateur au lieu d'un remplacement
+   sec, dans les deux sens, sans une ligne de script. Ignoré là où ce n'est pas
+   supporté, où la navigation reste simplement normale. #}
+<meta name="color-scheme" content="dark">
+<meta name="view-transition" content="same-origin">
+<style>html{background:#0b0c10}</style>
 <title>{% block title %}{{ brand }} hosting{% endblock %} — {{ app_name }}</title>
 <meta name="description" content="{% block description %}Hébergement de petits serveurs virtuels, auto-hébergé chez {{ brand }}.{% endblock %}">
 <link rel="stylesheet" href="/static/css/orion.css?v={{ asset_version }}">

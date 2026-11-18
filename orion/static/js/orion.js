@@ -247,10 +247,21 @@ document.addEventListener('click', function (event) {
 // its own; a refusal stays until someone closes it. Messages that belong to a
 // form stay with it - the selectors below only reach the page-level ones.
 (function () {
-  const region = document.createElement('div');
-  region.id = 'notices';
-  region.setAttribute('aria-live', 'polite');
-  document.body.appendChild(region);
+  // La région vit sur le corps du document, que htmx remplace pour un lien
+  // boosté : elle disparaît donc à chaque navigation. On la recrée au besoin —
+  // sinon les messages de la page suivante n'auraient nulle part où aller.
+  let region = null;
+  function regionIfNeeded() {
+    region = document.getElementById('notices');
+    if (!region) {
+      region = document.createElement('div');
+      region.id = 'notices';
+      region.setAttribute('aria-live', 'polite');
+      document.body.appendChild(region);
+    }
+    return region;
+  }
+  regionIfNeeded();
 
   const TRANSIENT = ['ok', 'info'];
   const PAGE_LEVEL = '#flash > .alert, .content > .alert, .content > .content-row > .alert';
@@ -284,7 +295,10 @@ document.addEventListener('click', function (event) {
   }
 
   lift();
-  document.body.addEventListener('htmx:afterSwap', function (event) { lift(event.target); });
+  document.body.addEventListener('htmx:afterSwap', function (event) {
+    regionIfNeeded();
+    lift(event.target);
+  });
   document.addEventListener('keydown', function (event) {
     if (event.key !== 'Escape') return;
     const last = region.lastElementChild;
