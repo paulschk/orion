@@ -131,15 +131,14 @@ def instance_context(instance, *, deep: bool = True) -> dict:
 
     job = tasks.latest_for_instance(instance["id"])
     return {
-        **_route_rows(instance),
+        # La carte d'adresses, sans détection : le rendu de la page ne paie pas
+        # l'interrogation de chaque port, le fragment de la liste s'en charge.
+        **_address_rows(instance),
         "instance": instance,
         "metrics": figures,
         "live_status": live_status,
         "memory_cap": plan_memory,
         "snapshots": snapshot_rows,
-        "custom_sites": [s for s in sites.list_sites(instance["id"])
-                         if not s["is_primary"]],
-        "ingress_ip": settings.ingress_ip,
         "steps": _job_steps(job),
         "job": job,
         "ssh_host": settings.ssh_host,
@@ -495,27 +494,25 @@ async def site_make_primary(request: Request, site_id: int):
     instance = _owned(site["instance_id"], session)
     if instance is not None and _wants_fragment(request):
         return _fragment(request, "partials/instance_addresses.html", session,
-                         message=message, **_route_rows(instance))
+                         message=message, **_address_rows(instance))
     return RedirectResponse(
         f"/app/instances/{site['instance_id']}?ok={quote(message)}", status_code=303)
 
 
 @router.get("/instances/{instance_id}/services")
 async def instance_services(request: Request, instance_id: int):
-    """The discoverable services, loaded after the page so a scan never delays it."""
+    """La liste d'adresses, détection comprise.
+
+    Chargée après la page pour qu'un balayage ne la retarde jamais, et
+    re-sondée toutes les minutes par le fragment lui-même. C'est la même carte
+    que le rendu initial remplit - une seule liste, une seule cible.
+    """
     session = require_user(request)
     instance = _owned(instance_id, session)
     if instance is None:
         return JSONResponse({"error": "not found"}, status_code=404)
-    rows = sites.list_sites(instance_id)
-    listening = services.listening_ports(instance["incus_name"])
-    return render(request, "partials/instance_services.html", session=session,
-                  instance=instance,
-                  found=services.discover(instance),
-                  published={row["upstream"]: row for row in rows},
-                  orphan_rows=[row for row in rows if row["upstream"] not in listening],
-                  default_domain=sites.default_domain(instance["slug"]),
-                  tenant_domain=settings.domain)
+    return render(request, "partials/instance_addresses.html", session=session,
+                  **_address_rows(instance, scan=True))
 
 
 @router.post("/instances/{instance_id}/services/publish")
@@ -550,20 +547,14 @@ async def service_publish(request: Request, instance_id: int):
     activity.log("service.publish", user_id=session["uid"], target=domain,
                  detail=f"port {port}")
     if _wants_fragment(request):
-        # Publishing adds a route, so the addresses card changes as well - sent
-        # out of band rather than by reloading the page around the terminal.
+        # Une seule carte, désormais : publier ajoute une adresse, donc la liste
+        # elle-même est la réponse. Plus de second fragment envoyé hors bande
+        # pour tenir à jour une carte qui n'existe plus.
         return _fragment(
-            request, "partials/instance_services.html", session,
+            request, "partials/instance_addresses.html", session,
             message=(domain + f" publie le port {port}") if ok else "Routage non appliqué : " + message,
             tone="ok" if ok else "err",
-            extra=_oob("instance-addresses", request, "partials/instance_addresses.html",
-                       session, **_route_rows(instance)),
-            found=services.discover(instance),
-            published={row["upstream"]: row for row in sites.list_sites(instance_id)},
-            orphan_rows=[row for row in sites.list_sites(instance_id)
-                         if row["upstream"] not in services.listening_ports(instance["incus_name"])],
-            default_domain=sites.default_domain(instance["slug"]),
-            tenant_domain=settings.domain)
+            **_address_rows(instance, scan=True))
     if not ok:
         return RedirectResponse(
             f"/app/instances/{instance_id}?err={quote('Routage non appliqué : ' + message)}",
@@ -589,14 +580,8 @@ def _wants_fragment(request: Request) -> bool:
     return request.headers.get("hx-request", "").lower() == "true"
 
 
-def _oob(element_id: str, request: Request, template: str, session, **context) -> str:
-    """The same partial, aimed at another element of the page."""
-    body = render(request, template, session=session, **context).body.decode()
-    return f'<div id="{element_id}" hx-swap-oob="true">{body}</div>'
-
-
 def _fragment(request: Request, template: str | None, session, *, message: str = "",
-              tone: str = "ok", extra: str = "", **context) -> HTMLResponse:
+              tone: str = "ok", **context) -> HTMLResponse:
     """A partial to swap in, carrying its own message.
 
     The message is rendered inside the fragment rather than into a slot at the
@@ -604,8 +589,6 @@ def _fragment(request: Request, template: str | None, session, *, message: str =
     same event, and the answer has to appear where the client is looking.
     """
     parts = []
-    if extra:
-        parts.append(extra)
     if message:
         parts.append(render(request, "partials/notice.html", session=session,
                             notice=message, notice_tone=tone).body.decode())
@@ -648,6 +631,30 @@ def _route_rows(instance) -> dict:
         "tenant_domain": settings.domain,
         "default_domain": (default_site["domain"] if default_site
                            else sites.default_domain(instance["slug"])),
+    }
+
+
+def _address_rows(instance, *, scan: bool = False) -> dict:
+    """Tout ce que la carte d'adresses — une seule liste — demande, en un seul
+    endroit.
+
+    La page, le sondage et chaque action qui change une adresse la construisent
+    par ici, donc un fragment et un rendu complet ne peuvent pas se contredire.
+
+    `scan=False` saute la détection des services. C'est ce qu'utilisent le rendu
+    de la page et les actions sur les adresses : la détection interroge en HTTP
+    chaque port à l'écoute, et la payer à chaque renommage mettrait des secondes
+    entre le clic et sa réponse. Sans détection, la carte dit seulement ce
+    qu'elle sait — les adresses — et le sondage suivant (load, every 60s) y
+    ajoute ce qui écoute.
+    """
+    rows = sites.list_sites(instance["id"])
+    return {
+        **_route_rows(instance),
+        "scanned": scan,
+        "found": services.discover(instance) if scan else [],
+        "published": {row["upstream"]: row for row in rows},
+        "ingress_ip": settings.ingress_ip,
     }
 
 
@@ -763,7 +770,7 @@ async def site_rename(request: Request, instance_id: int, site_id: int):
     problem = label_problem(label, instance_id=instance_id, site_id=site_id)
     if problem:
         return _refuse(request, session, instance, "partials/instance_addresses.html",
-                       problem, _route_rows(instance))
+                       problem, _address_rows(instance))
 
     domain = f"{label}{suffix}"
     try:
@@ -772,17 +779,17 @@ async def site_rename(request: Request, instance_id: int, site_id: int):
         # The checks above can lose a race against a create in another tab.
         return _refuse(request, session, instance, "partials/instance_addresses.html",
                        f"{domain} vient d'être pris par une autre instance.",
-                       _route_rows(instance))
+                       _address_rows(instance))
 
     ok, message = sites.sync_caddy()
     activity.log("site.renamed", user_id=session["uid"], target=domain, detail=previous)
     if not ok:
         return _refuse(request, session, instance, "partials/instance_addresses.html",
-                       "Routage non appliqué : " + message, _route_rows(instance))
+                       "Routage non appliqué : " + message, _address_rows(instance))
     text = previous + " devient " + domain
     if _wants_fragment(request):
         return _fragment(request, "partials/instance_addresses.html", session,
-                         message=text, **_route_rows(instance))
+                         message=text, **_address_rows(instance))
     return RedirectResponse(
         f"/app/instances/{instance_id}?ok={quote(text)}", status_code=303)
 
@@ -803,7 +810,7 @@ async def subdomain_set(request: Request, instance_id: int):
                             site_id=(primary["id"] if primary else None))
     if problem:
         return _refuse(request, session, instance, "partials/instance_addresses.html",
-                       problem, _route_rows(instance))
+                       problem, _address_rows(instance))
 
     domain = f"{label}.{settings.domain}"
     if primary is None:
@@ -816,11 +823,11 @@ async def subdomain_set(request: Request, instance_id: int):
                  detail=instance["slug"])
     if not ok:
         return _refuse(request, session, instance, "partials/instance_addresses.html",
-                       "Routage non appliqué : " + message, _route_rows(instance))
+                       "Routage non appliqué : " + message, _address_rows(instance))
     text = f"Adresse mise à jour : {domain}"
     if _wants_fragment(request):
         return _fragment(request, "partials/instance_addresses.html", session,
-                         message=text, **_route_rows(instance))
+                         message=text, **_address_rows(instance))
     return RedirectResponse(
         f"/app/instances/{instance_id}?ok={quote(text)}", status_code=303)
 
@@ -873,7 +880,7 @@ async def site_delete(request: Request, site_id: int):
         # The service list shows a "publié" badge for this route; it re-scans on
         # its own within the minute rather than paying for a scan on every click.
         return _fragment(request, "partials/instance_addresses.html", session,
-                         message=f"{site['domain']} retiré", **_route_rows(instance))
+                         message=f"{site['domain']} retiré", **_address_rows(instance))
     return RedirectResponse(f"/app/instances/{instance['id']}?ok=Domaine+retir%C3%A9", status_code=303)
 
 

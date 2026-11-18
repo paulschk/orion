@@ -2,21 +2,37 @@
 {% block head_extra %}
 <link rel="stylesheet" href="/static/vendor/xterm.min.css?v={{ asset_version }}">
 {% endblock %}
-{% set lbl = status_labels.get(instance['status'], (instance['status'], 'muted')) %}
 {% block title %}{{ instance['name'] }}{% endblock %}
 {% block breadcrumb %}<span class="breadcrumb"><a href="/app/instances">Mes instances</a> · {{ instance['slug'] }}</span>{% endblock %}
 {% block heading %}{{ instance['name'] }}{% endblock %}
+{% block content_class %}wide{% endblock %}
 
 {% block actions %}
-  <a class="btn btn-sm" href="#console">Console</a>
+  {# L'ancre visait #console, qui n'existe pas : le terminal porte #terminal. #}
+  <a class="btn btn-sm" href="#terminal">Console</a>
 {% endblock %}
 
 {% block content %}
 
-<div class="grid cols-2">
+{# Le bandeau remplace la carte « État » : il prend toute la largeur, porte
+   l'identité de l'instance, ses cinq champs puis ses trois grandeurs, chacune
+   avec la note qui dit ce que la barre rapporte. #}
+<section class="band">
+  <div class="band-head">
+    <h2>État</h2>
+    <span class="sub">{{ instance['slug'] }}.{{ domain }}</span>
+    <span class="legend">
+      <span><i class="m-full"></i>En ligne</span>
+      <span><i class="m-ring"></i>au repos</span>
+      <span><i class="m-warn"></i>à surveiller</span>
+      <span><i class="m-fail"></i>en erreur</span>
+    </span>
+  </div>
 
-  <div class="card">
-    <div class="card-h"><h2>État</h2><span class="sub mono">{{ instance['slug'] }}.{{ domain }}</span></div>
+  <div class="band-row">
+    {# L'état est sondé, les boutons d'alimentation ne le sont pas : deux
+       éléments dans une même rangée, plutôt qu'un fragment qui réécrirait les
+       boutons toutes les vingt secondes. #}
     <div id="instance-status"
          hx-get="/api/instances/{{ instance['id'] }}/partial"
          hx-trigger="{{ 'every 2s' if instance['status'] == 'provisioning' else 'every 20s' }}"
@@ -24,7 +40,7 @@
       {% include "partials/instance_status.html" %}
     </div>
 
-    <div class="row tight mt3">
+    <span class="row tight push">
       <form method="post" action="/app/instances/{{ instance['id'] }}/power" class="inline-form">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="start">
         <button class="btn btn-sm" {{ 'disabled' if instance['status'] == 'running' }}>Démarrer</button>
@@ -37,34 +53,60 @@
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="stop">
         <button class="btn btn-sm btn-danger" {{ 'disabled' if instance['status'] != 'running' }}>Arrêter</button>
       </form>
+    </span>
+  </div>
+
+  <div class="band-row">
+    <div class="kv-inline">
+      <div><span class="k">Offre</span><span class="v">{{ instance['plan_name'] or '—' }}</span></div>
+      <div><span class="k">Modèle</span><span class="v"><span class="pill">{{ instance['template'] }}</span></span></div>
+      <div><span class="k">Adresse interne</span><span class="v mono">{{ instance['container_ip'] or '—' }}</span></div>
+      <div><span class="k">Créée le</span><span class="v mono">{{ instance['created_at'][:10] }}</span></div>
+      <div><span class="k">Renouvellement</span><span class="v mono">{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</span></div>
     </div>
+  </div>
 
-    <dl class="kv mt3">
-      <dt>Offre</dt><dd>{{ instance['plan_name'] or '—' }}</dd>
-      <dt>Modèle</dt><dd><span class="pill">{{ instance['template'] }}</span></dd>
-      <dt>Adresse interne</dt><dd class="mono">{{ instance['container_ip'] or '—' }}</dd>
-      <dt>Créée le</dt><dd>{{ instance['created_at'][:10] }}</dd>
-      <dt>Renouvellement</dt><dd>{{ instance['expires_at'][:10] if instance['expires_at'] else '—' }}</dd>
-    </dl>
-
-    {# This card is tall because the access card beside it is; the space is
-       where a client looks for what the instance is consuming. Polled on its
-       own so a slow measurement never delays the page. #}
-    <div class="mt3" id="instance-metrics"
+  {# Mesuré à part, et rapporté à ce que le client loue : une lecture lente ne
+     retarde jamais la page, et l'hôte n'apparaît nulle part ici. #}
+  <div class="band-row">
+    <div class="gauges" id="instance-metrics"
          hx-get="/app/instances/{{ instance['id'] }}/metrics"
          hx-trigger="load, every 10s"
-         hx-swap="innerHTML">
+         hx-swap="innerHTML transition:false">
       {% include "partials/instance_metrics.html" %}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-h"><h2>Accès SSH</h2><span class="sub">Depuis votre réseau</span></div>
+  <div class="band-row">
+    <span class="band-note">Utilisation rapportée aux ressources de cette instance.</span>
+  </div>
+</section>
+
+<div class="grid">
+
+  {# La coquille et le portail sont les deux entrées de l'instance : ils se font
+     face, plutôt qu'aux deux bouts de la page. #}
+  <section class="tile span8" id="terminal">
+    <div class="tile-h">
+      <h2>Terminal</h2>
+      <span class="sub" id="terminal-status"></span>
+    </div>
+    <div id="terminal" class="term-pane"
+         data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
+         data-state="{{ instance['status'] }}"></div>
+    <p class="tiny dim mt2">
+      Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
+      fonctionnent. Chaque ouverture de session est journalisée.
+    </p>
+  </section>
+
+  <section class="tile span4">
+    <div class="tile-h"><h2>Accès SSH</h2><span class="sub">Depuis votre réseau</span></div>
     {% if instance['ssh_port'] %}
       <div class="stack">
         <div>
           <div class="tiny dim">Commande de connexion</div>
-          <div class="codebox">{{ ssh_command }}<button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
+          <div class="codebox">{{ ssh_command }}<button class="btn btn-sm btn-ghost"
                 data-copy="{{ ssh_command }}">Copier</button></div>
         </div>
         <dl class="kv">
@@ -76,7 +118,7 @@
         {% if ssh_config %}
         <div>
           <div class="tiny dim">Entrée ~/.ssh/config — plus de port à retenir</div>
-          <div class="codebox">{{ ssh_config }}<button class="btn btn-sm btn-ghost" style="float:right;margin:-4px -6px 0 8px"
+          <div class="codebox">{{ ssh_config }}<button class="btn btn-sm btn-ghost"
                 data-copy="{{ ssh_config }}">Copier</button></div>
         </div>
         {% endif %}
@@ -97,109 +139,75 @@
     {% else %}
       <p class="small dim">Le port SSH sera attribué à la fin du provisionnement.</p>
     {% endif %}
-  </div>
-</div>
+  </section>
 
-{# Directly under the access details: the shell and the portal are the two ways
-   in, so they sit together rather than at opposite ends of the page. #}
-<div class="card">
-  <div class="card-h">
-    <h2>Terminal</h2>
-    <span class="sub" id="terminal-status"></span>
-  </div>
-  <div id="terminal" class="term-pane"
-       data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
-       data-state="{{ instance['status'] }}"></div>
-  <p class="tiny dim mt2">
-    Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran
-    fonctionnent. Chaque ouverture de session est journalisée.
-  </p>
-</div>
-
-{% if instance['template'] == 'wordpress' and wp_creds %}
-<div class="card">
-  <div class="card-h"><h2>WordPress</h2><span class="sub">Généré à l'installation</span></div>
-  <div class="spread">
-    <div class="small">Identifiants administrateur : <span class="mono">admin</span> / mot de passe ci-contre</div>
-    <button class="btn btn-sm" data-reveal="#wppass" data-value="{{ wp_creds.splitlines()[0] }}">Afficher</button>
-  </div>
-  <div class="codebox mt2" id="wppass">••••••••••••••••••••</div>
-  <div class="small muted mt2">
-    Mot de passe de la base de données :
-    <button class="btn btn-sm btn-ghost" data-reveal="#dbpass" data-value="{{ wp_creds.splitlines()[1] if wp_creds.splitlines()|length > 1 else '' }}">Afficher</button>
-    <span class="mono" id="dbpass">••••••••</span>
-  </div>
-</div>
-{% endif %}
-
-<div class="card">
-  <div class="card-h">
-    <h2>Adresses web</h2>
-    <span class="sub">{{ site_rows|length }} adresse(s)</span>
-  </div>
-  <div id="instance-addresses">
-    {% include "partials/instance_addresses.html" %}
-  </div>
-</div>
-
-{# The non-technical path: the panel looks at what is actually listening in the
-   instance and offers it, instead of asking for an upstream port. Loaded after
-   the page so the scan never delays it. #}
-<div class="card">
-  <div class="card-h">
-    <h2>Publier un service</h2>
-    <span class="sub">détecté dans votre instance</span>
-    <button class="btn btn-sm btn-ghost" style="margin-left:auto"
-            title="Relancer la détection maintenant"
-            hx-get="/app/instances/{{ instance['id'] }}/services"
-            hx-target="#instance-services" hx-swap="innerHTML"
-            hx-indicator="#svc-busy">
-      <span id="svc-busy" class="spinner htmx-indicator" aria-hidden="true"></span>Rafraîchir
-    </button>
-  </div>
-  {# The list re-scans on its own once a minute, so a service started after the
-     page was opened turns up without a reload; the button makes it immediate. #}
-  <div id="instance-services"
-       hx-get="/app/instances/{{ instance['id'] }}/services"
-       hx-trigger="load, every 60s"
-       hx-swap="innerHTML">
-    <p class="small dim">Recherche des services en cours…</p>
-  </div>
-</div>
-
-{# A snapshot is what you take before running something you might regret. #}
-<div class="card">
-  <div class="card-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
-  <div id="instance-snapshots">
-    {% include "partials/instance_snapshots.html" %}
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-h">
-    <h2>Journal de provisionnement</h2>
-    <span class="sub">{{ job['status'] if job else '—' }}</span>
-  </div>
-  {% if job and job['log'] %}
-    <div class="job-log">{{ job['log'] }}</div>
-  {% else %}
-    <p class="small dim">Aucun journal disponible.</p>
-  {% endif %}
-</div>
-
-<div class="card" style="border-color:#5a2a2a">
-  <div class="card-h"><h2>Zone sensible</h2></div>
-  <p class="small muted mb2">
-    La destruction supprime le conteneur, ses données et ses instantanés. L'opération est irréversible.
-  </p>
-  <form method="post" action="/app/instances/{{ instance['id'] }}/destroy"
-        data-confirm-slug="{{ instance['slug'] }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="row tight">
-      <input class="input grow" name="confirm" placeholder="Saisissez {{ instance['slug'] }} pour confirmer">
-      <button class="btn btn-danger">Détruire l'instance</button>
+  {# Les identifiants du modèle, quand il en génère. Hors maquette : elle ne
+     montre pas d'instance WordPress, mais la carte a sa place avec les accès. #}
+  {% if instance['template'] == 'wordpress' and wp_creds %}
+  <section class="tile span12">
+    <div class="tile-h"><h2>WordPress</h2><span class="sub">Généré à l'installation</span></div>
+    <div class="spread">
+      <div class="small">Identifiants administrateur : <span class="mono">admin</span> / mot de passe ci-contre</div>
+      <button class="btn btn-sm" data-reveal="#wppass" data-value="{{ wp_creds.splitlines()[0] }}">Afficher</button>
     </div>
-  </form>
+    <div class="codebox mt2" id="wppass">••••••••••••••••••••</div>
+    <div class="small muted mt2">
+      Mot de passe de la base de données :
+      <button class="btn btn-sm btn-ghost" data-reveal="#dbpass" data-value="{{ wp_creds.splitlines()[1] if wp_creds.splitlines()|length > 1 else '' }}">Afficher</button>
+      <span class="mono" id="dbpass">••••••••</span>
+    </div>
+  </section>
+  {% endif %}
+
+  {# Une seule carte pour les adresses : la liste de services et la table
+     d'adresses disaient la même chose en deux endroits. Le fragment se
+     re-scanne toutes les minutes, donc un service lancé après l'ouverture de la
+     page apparaît sans rechargement. #}
+  <section class="tile span12" id="adresses">
+    <div id="instance-addresses"
+         hx-get="/app/instances/{{ instance['id'] }}/services"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML transition:false">
+      {% include "partials/instance_addresses.html" %}
+    </div>
+  </section>
+
+  {# Un instantané, c'est ce qu'on prend avant de lancer quelque chose qu'on
+     pourrait regretter. #}
+  <section class="tile span5">
+    <div class="tile-h"><h2>Sauvegardes</h2><span class="sub">{{ snapshots|length }}</span></div>
+    <div id="instance-snapshots">
+      {% include "partials/instance_snapshots.html" %}
+    </div>
+  </section>
+
+  <section class="tile span7">
+    <div class="tile-h">
+      <h2>Journal de provisionnement</h2>
+      <span class="sub mono">{{ job['status'] if job else '—' }}</span>
+    </div>
+    {% if job and job['log'] %}
+      <div class="job-log">{{ job['log'] }}</div>
+    {% else %}
+      <p class="small dim">Aucun journal disponible.</p>
+    {% endif %}
+  </section>
+
+  <section class="tile span12 danger">
+    <div class="tile-h"><h2>Zone sensible</h2></div>
+    <p class="small muted mb2">
+      La destruction supprime le conteneur, ses données et ses instantanés. L'opération est irréversible.
+    </p>
+    <form method="post" action="/app/instances/{{ instance['id'] }}/destroy"
+          data-confirm-slug="{{ instance['slug'] }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row tight">
+        <input class="input grow" name="confirm" placeholder="Saisissez {{ instance['slug'] }} pour confirmer">
+        <button class="btn btn-danger">Détruire l'instance</button>
+      </div>
+    </form>
+  </section>
+
 </div>
 {% endblock %}
 

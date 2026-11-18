@@ -43,11 +43,7 @@
     {% endfor %}
   </ul>
   {% endif %}
-
-{% elif metrics %}
-  <dl class="kv mt2">
-    <dt>Mémoire</dt><dd class="mono">{{ metrics['memory_used']|human_bytes }}{% if memory_cap %} / {{ memory_cap }}{% endif %}</dd>
-    <dt>Processus</dt><dd class="mono">{{ metrics['processes'] }}</dd>
-    <dt>CPU cumulé</dt><dd class="mono">{{ (metrics['cpu_ns'] / 1000000000)|round(1) }} s</dd>
-  </dl>
+  {# Mémoire, processus et CPU cumulé figuraient ici en liste. Ils sont dans les
+     trois jauges du bandeau - des grandeurs rapportées à la location, plutôt
+     que trois nombres bruts au même endroit. #}
 {% endif %}

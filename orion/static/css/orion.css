@@ -8,7 +8,10 @@
   --border-soft: #171a21;
   --text: #e0e0e0;
   --text-muted: #9ca3af;
-  --text-dim: #6b7280;
+  /* Raised from #6b7280, which measured 3.67:1 on --card and 4.04:1 on --bg -
+     under AA for the 11-13px text it serves (.tiny.dim, .timeline .when,
+     .card-h .sub). This value measures 4.88:1 and 5.38:1. */
+  --text-dim: #7e8794;
   --accent: #3b82f6;
   --accent-dark: #2563eb;
   --accent-soft: rgba(59, 130, 246, 0.12);
@@ -34,6 +37,8 @@ body {
   color: var(--text);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* The register: every figure in the panel lines up in its column. */
+  font-variant-numeric: tabular-nums;
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -209,8 +214,8 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); bo
 .bar { height: 7px; border-radius: 999px; background: var(--border-soft); overflow: hidden; margin-top: 10px; }
 .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .6s cubic-bezier(.4, 0, .2, 1); }
 .bar.ok > span { background: #4ade80; }
-.metric { margin-top: 14px; }
-.metric .bar { margin-top: 7px; }
+/* Was .metric / .metric .bar, for the state card's three figures. Those are
+   gauges inside the band now (see the 07 section at the end of this file). */
 .input-sm { padding: 5px 9px; font-size: .82rem; }
 .htmx-indicator { opacity: 0; transition: opacity .15s ease-in; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
@@ -219,10 +224,9 @@ section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); bo
 .bar.bad > span { background: #f87171; }
 
 /* ---------------------------------------------------------------- modes */
-.mode { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: var(--bg-alt); }
-.mode-head { display: flex; gap: 12px; align-items: flex-start; }
-.mode-head .pill { flex: none; margin-top: 1px; }
-.mode-title { font-weight: 650; font-size: .95rem; }
+/* .mode / .mode-head / .mode-title habillaient la carte « Simple » de l'ancienne
+   vue d'adresses : la liste fusionnée les remplace (voir la section 07 en fin de
+   fichier). */
 details.advanced { border-top: 1px solid var(--border); padding-top: 14px; }
 details.advanced > summary, details > summary {
   cursor: pointer; font-weight: 600; font-size: .92rem; color: var(--text-muted);
@@ -268,38 +272,9 @@ details > summary:hover { color: var(--text); }
 .loader-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* -------------------------------------------------------------- addresses */
-/* The address is the subject of the simple-mode card, so it gets the room: the
-   label read first, the shared domain behind it, the facts about it on the
-   right, and one button. The copy button used to be floated over a code box
-   with negative margins to make it sit inside the padding. */
-.addr-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-  padding: 11px 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.addr-main {
-  font-size: .95rem;
-  font-weight: 600;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-.addr-main:hover .addr-label { text-decoration: underline; }
-.addr-tags { display: flex; gap: 6px; margin-left: auto; flex: none; }
-.addr-card .btn { flex: none; }
-@media (max-width: 640px) {
-  .addr-card { flex-wrap: wrap; gap: 8px; }
-  .addr-tags { margin-left: 0; }
-}
-.addr { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
-.addr-host { text-decoration: none; white-space: nowrap; }
-.addr-label { color: var(--accent); font-weight: 600; }
-.addr-zone { color: var(--text-dim); }
-.addr-host:hover .addr-label { text-decoration: underline; }
+/* The old single-address card lived here (.addr-card, .addr-tags, .addr and
+   .addr-host), with a copy button floated over a code box. The merged list at
+   the end of this file replaces all of it - see "une seule liste d'adresses". */
 .inline-edit > summary {
   cursor: pointer;
   list-style: none;
@@ -346,9 +321,11 @@ details > summary:hover { color: var(--text); }
 }
 
 /* ---------------------------------------------------------------- badges */
+/* The register: a badge is a monospace label, not a rounded sticker. */
 .badge {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 0.76rem; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  font-family: var(--mono); font-size: 0.72rem;
+  padding: 2px 8px; border-radius: 999px;
   background: var(--tag-bg); color: var(--tag-text); white-space: nowrap;
 }
 .badge.ok { background: var(--ok-bg); color: var(--ok); }
@@ -357,8 +334,20 @@ details > summary:hover { color: var(--text); }
 .badge.idle { background: var(--border-soft); color: var(--text-muted); }
 .badge.muted { background: var(--border-soft); color: var(--text-dim); }
 .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* The three marks of the legend, in a badge: filled = live, ring = at rest,
+   hatched = needs watching. One glyph, one meaning - the same vocabulary the
+   gauges and the address rows use. */
+.badge .dot.ring { background: none; box-shadow: inset 0 0 0 1px currentColor; }
+.badge .dot.hatch {
+  width: 11px; height: 7px; border-radius: 1px; background: none;
+  background-image: repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px);
+}
 
-.pill { font-size: 0.74rem; padding: 2px 8px; border-radius: 6px; background: var(--tag-bg); color: var(--tag-text); }
+.pill {
+  display: inline-block; font-family: var(--mono); font-size: 0.68rem;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 1px 7px; border-radius: 3px; background: var(--tag-bg); color: var(--tag-text);
+}
 
 /* ---------------------------------------------------------------- buttons */
 .btn {
@@ -391,8 +380,10 @@ textarea.input { min-height: 90px; resize: vertical; font-family: var(--mono); f
 select.input {
   appearance: none;
   padding-right: 34px;
-  /* Replaces the native chevron that `appearance: none` removes. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23c4a882' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* Replaces the native chevron that `appearance: none` removes. Stroke was
+     #c4a882 - a warm tan left over from the retired palette, on a blue-black
+     panel; it is a muted grey now, like every other ornament. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%239ca3af' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 11px;
@@ -496,6 +487,12 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
   padding: 12px 14px; font-family: var(--mono); font-size: 0.85rem;
   color: var(--text); overflow-x: auto; white-space: pre-wrap; word-break: break-all;
 }
+/* A copy button sitting in the corner of its own code box, rather than floated
+   over it with negative margins to tuck it inside the padding. Scoped to the
+   boxes that actually contain a button: the password boxes do not, and would
+   otherwise carry 80px of empty right padding. */
+.codebox:has(> .btn) { position: relative; padding-right: 80px; }
+.codebox > .btn { position: absolute; top: 8px; right: 8px; }
 .term-pane {
   position: relative;
   /* A target height, not a promise: the script snaps it to a whole number of
@@ -659,4 +656,196 @@ table.table .id { color: var(--text-dim); font-family: var(--mono); font-size: 0
 
 @media (min-width: 901px) {
   .topbar .nav-toggle, .side-scrim { display: none; }
+}
+
+/* ==========================================================================
+   07 — NODE29
+   Le bandeau d'état pleine largeur, la grille de tuiles à douze colonnes, le
+   registre typographique (libellés en monospace capitales, chiffres alignés,
+   filets d'un pixel, angles à 3 px) et la liste d'adresses fusionnée.
+   C'est un ajout au-dessus de ce qui précède : les formulaires, le terminal,
+   le journal, les alertes et la timeline gardent leurs règles.
+   ========================================================================== */
+
+/* Le bandeau prend toute la largeur : il porte l'identité de la machine ou de
+   l'instance et ses trois grandeurs, là où une carte les enfermait dans une
+   colonne. Une `.content` sans marge latérale, pour qu'il touche les bords. */
+.content.wide { padding: 0 0 56px; gap: 0; }
+
+.band { background: var(--card); border-bottom: 1px solid var(--border); }
+.band-head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 14px 28px 10px;
+}
+.band-head h2 { font-size: 1.02rem; }
+.band-head .sub { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+.band-row {
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 0 28px 14px;
+}
+.band-row + .band-row { border-top: 1px solid var(--border-soft); padding-top: 13px; }
+.band-row .push { margin-left: auto; }
+.band-note { font-size: 0.78rem; color: var(--text-dim); }
+
+/* La légende des marques, à droite du titre : pastille pleine = en ligne,
+   anneau = au repos, hachures = à surveiller, pastille rouge = en erreur.
+   C'est le vocabulaire des jauges et des lignes d'adresses, posé une fois. */
+.legend {
+  display: flex; align-items: center; gap: 15px; margin-left: auto;
+  font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-dim);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; flex: none; }
+.legend .m-full { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.legend .m-ring { width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--text-dim); }
+.legend .m-warn {
+  width: 12px; height: 7px;
+  background: repeating-linear-gradient(45deg, var(--warn) 0 3px, rgba(251, 191, 36, 0.12) 3px 6px);
+}
+.legend .m-fail { width: 6px; height: 6px; border-radius: 50%; background: var(--bad); }
+
+/* Les trois jauges. Le libellé est en monospace capitales, la valeur alignée
+   à droite en monospace tabulaire, et la note dit ce que la barre rapporte. */
+.lbl {
+  font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.16em; color: var(--text-dim);
+}
+.gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; width: 100%; }
+/* Une note sous les trois jauges occupe toute la largeur plutôt qu'une seule
+   colonne : la raison d'une absence de mesure se lit en entier. */
+.gauges > .note { grid-column: 1 / -1; font-size: 0.72rem; color: var(--text-dim); }
+.gauge-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gauge-h .val { font-family: var(--mono); font-size: 0.8rem; }
+.gauges .bar { margin: 8px 0 6px; height: 6px; }
+.gauge .note { font-size: 0.72rem; color: var(--text-dim); }
+/* La marque des hachures se pose devant le libellé de la grandeur concernée,
+   jamais sur la barre : posée sur la barre, elle se lisait comme « le vCPU
+   réservé » alors que la note à côté dit exactement cela. */
+.gauge.attn .lbl::before {
+  content: ""; display: inline-block; width: 12px; height: 7px; margin-right: 7px;
+  vertical-align: -1px;
+  background: repeating-linear-gradient(45deg, var(--warn) 0 3px, rgba(251, 191, 36, 0.12) 3px 6px);
+}
+
+/* La grille de tuiles à douze colonnes. Le balisage de la maquette est gardé
+   (.grid / .tile / .spanN), mais la grille à douze colonnes ne s'applique
+   qu'à une `.grid` qui contient des tuiles : les pages publiques portent elles
+   aussi `.grid`, et leur mise en page ne doit pas bouger. Sans `:has()`, les
+   tuiles s'empilent en pleine largeur - une dégradation propre, pas une casse. */
+.grid:has(> .tile) {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px; padding: 16px 28px 0;
+}
+.grid:has(> .tile) > .tile { grid-column: span 12; }
+.grid:has(> .tile) > .span3 { grid-column: span 3; }
+.grid:has(> .tile) > .span4 { grid-column: span 4; }
+.grid:has(> .tile) > .span5 { grid-column: span 5; }
+.grid:has(> .tile) > .span7 { grid-column: span 7; }
+.grid:has(> .tile) > .span8 { grid-column: span 8; }
+.grid:has(> .tile) > .span12 { grid-column: span 12; }
+
+.tile {
+  background: var(--card); border: 1px solid var(--border); border-radius: 3px;
+  padding: 16px 18px 18px; min-width: 0;
+}
+.tile-h {
+  display: flex; align-items: baseline; justify-content: flex-start;
+  gap: 12px; margin-bottom: 14px;
+}
+.tile-h h2 { font-size: 1.02rem; }
+.tile-h .sub { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+.tile-h .btn { margin-left: auto; align-self: center; flex: none; }
+.tile .k {
+  font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.16em; color: var(--text-dim);
+}
+.tile .v {
+  font-family: var(--mono); font-size: 1.7rem; font-weight: 500;
+  letter-spacing: -0.02em; margin-top: 7px;
+}
+.tile .v small { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); }
+.tile .s { font-size: 0.82rem; color: var(--text-dim); margin-top: 2px; }
+.tile.attn { border-color: rgba(251, 191, 36, 0.34); }
+.tile.danger { border-color: #5a2b2b; }
+
+/* Les cinq champs du bandeau, en ligne. */
+.kv-inline {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px 20px; width: 100%;
+}
+.kv-inline > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kv-inline .k {
+  font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--text-dim);
+}
+.kv-inline .v { font-size: 0.9rem; }
+
+/* ------------------------------------------ une seule liste d'adresses */
+.addr-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.addr-list { display: flex; flex-direction: column; }
+.addr-row {
+  display: grid; grid-template-columns: 178px minmax(0, 1fr) auto;
+  gap: 16px; align-items: center;
+  padding: 12px 0; border-bottom: 1px solid var(--border-soft);
+}
+.addr-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.addr-state { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.addr-main {
+  font-size: 0.9rem; font-weight: 500; text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.addr-main .addr-label { color: var(--accent); font-weight: 600; }
+.addr-main .addr-zone { color: var(--text-dim); }
+.addr-main:hover .addr-label { text-decoration: underline; }
+.addr-main.pending { color: var(--text-dim); }
+.addr-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
+.addr-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.addr-caution { margin-top: 4px; font-size: 0.78rem; color: var(--warn); }
+
+/* Une rangée de contenu dans la colonne, avec la même gouttière que la grille :
+   sert aux alertes de condition vivante, que la maquette ne peut pas montrer
+   (une tâche en cours, un hôte injoignable). */
+.content-row { padding: 16px 28px 0; }
+
+/* La référence d'une offre, telle qu'elle apparaît dans le registre. */
+.slug {
+  font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 3px;
+  padding: 0 5px; margin-left: 6px; white-space: nowrap;
+}
+
+/* Le bandeau est re-mesuré toutes les dix secondes, et le fragment d'état
+   toutes les deux : sans cela, l'animation d'arrivée d'htmx se rejoue à chaque
+   sondage et la page paraît se recharger toute seule. La liste d'adresses se
+   re-scanne toutes les minutes pour la même raison. */
+#instance-metrics .htmx-added,
+#instance-metrics .htmx-added *,
+#instance-addresses .htmx-added,
+#instance-addresses .htmx-added * { animation: none; }
+
+@media (max-width: 1180px) {
+  .grid:has(> .tile) > .span3,
+  .grid:has(> .tile) > .span4,
+  .grid:has(> .tile) > .span5,
+  .grid:has(> .tile) > .span7,
+  .grid:has(> .tile) > .span8 { grid-column: span 6; }
+}
+
+@media (max-width: 900px) {
+  .grid:has(> .tile) { padding: 12px 16px 0; }
+  .content-row { padding: 12px 16px 0; }
+  /* Une tuile à demi-largeur sur un téléphone ne se lit pas : elles reprennent
+     toute la largeur, quelle que soit leur portée. */
+  .grid:has(> .tile) > .tile { grid-column: span 12 !important; }
+  .band-head, .band-row { padding-left: 16px; padding-right: 16px; }
+  .legend { margin-left: 0; width: 100%; }
+  .band-row .push { margin-left: 0; }
+  .gauges { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .addr-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .addr-actions { justify-content: flex-start; }
 }

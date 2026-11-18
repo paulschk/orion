@@ -2,58 +2,59 @@
 {% block title %}Vue d'ensemble{% endblock %}
 {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting · exploitation</span>{% endblock %}
 {% block heading %}Vue d'ensemble{% endblock %}
+{% block content_class %}wide{% endblock %}
 {% block actions %}
   <a class="btn btn-sm" href="/admin/sites">Routage</a>
 {% endblock %}
 
 {% block content %}
 
-<div class="stat-grid">
-  <div class="stat accent"><div class="k">Instances</div><div class="v">{{ counters.instances }}</div>
-    <div class="tiny dim">{{ counters.running }} en ligne{% if counters.errors %}, <span style="color:var(--bad)">{{ counters.errors }} en erreur</span>{% endif %}</div></div>
-  <div class="stat"><div class="k">Clients</div><div class="v">{{ counters.clients }}</div></div>
-  <div class="stat"><div class="k">Sites routés</div><div class="v">{{ counters.sites }}</div></div>
-  <div class="stat {{ 'warn' if counters.outstanding }}"><div class="k">Encours</div>
-    <div class="v">{{ counters.outstanding|money }}</div>
-    <div class="tiny dim">{{ counters.unpaid }} facture(s) ouverte(s)</div></div>
-</div>
-
+{# Le bandeau remplace la carte « Hôte détecté » : il prend toute la largeur,
+   porte l'identité de la machine puis ses trois grandeurs, chacune avec la note
+   qui dit ce que la barre rapporte. #}
 {% if info.reachable %}
-<div class="card">
-  <div class="card-h">
+<section class="band">
+  <div class="band-head">
     <h2>Hôte détecté</h2>
     <span class="sub">{{ info.os_name }} · noyau {{ info.kernel }} · Incus {{ info.incus_version }}</span>
-  </div>
-  <div class="spread">
-    <div class="row">
-      <span class="badge">{{ info.host_name }}</span>
-      <span class="badge idle">{{ info.cpu_model }}</span>
-      <span class="badge idle">pare-feu {{ info.firewall }}</span>
-    </div>
-    <span class="tiny dim">Détecté à {{ info.detected_at[11:19] }} UTC</span>
+    <span class="legend">
+      <span><i class="m-full"></i>En ligne</span>
+      <span><i class="m-ring"></i>au repos</span>
+      <span><i class="m-warn"></i>à surveiller</span>
+      <span><i class="m-fail"></i>en erreur</span>
+    </span>
   </div>
 
-  <div class="grid cols-3 mt3">
-    <div>
-      <div class="spread small"><span class="muted">vCPU</span><span class="mono">{{ alloc.vcpu }} / {{ info.sellable_vcpu }}</span></div>
-      {% set cpu_pct = (alloc.vcpu * 100 // info.sellable_vcpu) if info.sellable_vcpu else 0 %}
-      <div class="bar {{ 'bad' if cpu_pct > 90 else ('warn' if cpu_pct > 70 else '') }}"><span style="width:{{ [cpu_pct, 100]|min }}%"></span></div>
-      <div class="tiny dim mt1">{{ info.reserve_vcpu }} vCPU réservés au système</div>
-    </div>
-    <div>
-      <div class="spread small"><span class="muted">Mémoire</span><span class="mono">{{ alloc.ram_mb|human_mb }} / {{ info.sellable_ram_mb|human_mb }}</span></div>
-      {% set ram_pct = (alloc.ram_mb * 100 // info.sellable_ram_mb) if info.sellable_ram_mb else 0 %}
-      <div class="bar {{ 'bad' if ram_pct > 90 else ('warn' if ram_pct > 70 else '') }}"><span style="width:{{ [ram_pct, 100]|min }}%"></span></div>
-      <div class="tiny dim mt1">{{ info.ram_total_mb|human_mb }} au total, {{ info.reserve_ram_mb|human_mb }} réservés</div>
-    </div>
-    <div>
-      <div class="spread small"><span class="muted">Disque</span><span class="mono">{{ alloc.disk_gb }} / {{ info.sellable_disk_gb }} GB</span></div>
-      {% set disk_pct = (alloc.disk_gb * 100 // info.sellable_disk_gb) if info.sellable_disk_gb else 0 %}
-      <div class="bar {{ 'bad' if disk_pct > 90 else ('warn' if disk_pct > 70 else '') }}"><span style="width:{{ [disk_pct, 100]|min }}%"></span></div>
-      <div class="tiny dim mt1">pool {{ info.pool_name }} · {{ info.pool_total_gb }} GB</div>
+  <div class="band-row">
+    <span class="badge">{{ info.host_name }}</span>
+    <span class="badge idle">{{ info.cpu_model }}</span>
+    <span class="badge idle">pare-feu {{ info.firewall }}</span>
+    <span class="tiny dim mono push">Détecté à {{ info.detected_at[11:19] }} UTC</span>
+  </div>
+
+  {% set cpu_pct = (alloc.vcpu * 100 // info.sellable_vcpu) if info.sellable_vcpu else 0 %}
+  {% set ram_pct = (alloc.ram_mb * 100 // info.sellable_ram_mb) if info.sellable_ram_mb else 0 %}
+  {% set disk_pct = (alloc.disk_gb * 100 // info.sellable_disk_gb) if info.sellable_disk_gb else 0 %}
+  <div class="band-row">
+    <div class="gauges">
+      <div class="gauge {{ 'attn' if cpu_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">vCPU</span><span class="val">{{ alloc.vcpu }} / {{ info.sellable_vcpu }}</span></div>
+        <div class="bar {{ 'bad' if cpu_pct > 90 else ('warn' if cpu_pct > 70 else '') }}"><span style="width:{{ [cpu_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ info.reserve_vcpu }} vCPU réservé au système</div>
+      </div>
+      <div class="gauge {{ 'attn' if ram_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Mémoire</span><span class="val">{{ alloc.ram_mb|human_mb }} / {{ info.sellable_ram_mb|human_mb }}</span></div>
+        <div class="bar {{ 'bad' if ram_pct > 90 else ('warn' if ram_pct > 70 else '') }}"><span style="width:{{ [ram_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ info.ram_total_mb|human_mb }} au total, {{ info.reserve_ram_mb|human_mb }} réservés</div>
+      </div>
+      <div class="gauge {{ 'attn' if disk_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Disque</span><span class="val">{{ alloc.disk_gb }} / {{ info.sellable_disk_gb }} GB</span></div>
+        <div class="bar {{ 'bad' if disk_pct > 90 else ('warn' if disk_pct > 70 else '') }}"><span style="width:{{ [disk_pct, 100]|min }}%"></span></div>
+        <div class="note">pool {{ info.pool_name }} · {{ info.pool_total_gb }} GB</div>
+      </div>
     </div>
   </div>
-</div>
+</section>
 {% else %}
 <div class="alert err">
   <strong>Incus est injoignable.</strong> Le panneau ne peut ni lire la machine ni provisionner.
@@ -61,16 +62,38 @@
 </div>
 {% endif %}
 
-<div class="grid cols-2" style="align-items:start">
-  <div class="card">
-    <div class="card-h"><h2>Capacité par offre</h2><span class="sub">instances encore plaçables</span></div>
+{% if running_jobs %}
+<div class="content-row"><div class="alert info">{{ running_jobs }} tâche(s) en cours d'exécution sur l'hôte.</div></div>
+{% endif %}
+
+<div class="grid">
+
+  <div class="tile span3">
+    <div class="k">Instances</div><div class="v">{{ counters.instances }}</div>
+    <div class="s">{{ counters.running }} en ligne{% if counters.errors %}, <span class="bad">{{ counters.errors }} en erreur</span>{% endif %}</div>
+  </div>
+  <div class="tile span3">
+    <div class="k">Clients</div><div class="v">{{ counters.clients }}</div>
+    <div class="s">inscrits</div>
+  </div>
+  <div class="tile span3">
+    <div class="k">Sites routés</div><div class="v">{{ counters.sites }}</div>
+    <div class="s">domaines servis</div>
+  </div>
+  <div class="tile span3 {{ 'attn' if counters.outstanding }}">
+    <div class="k">Encours</div><div class="v">{{ counters.outstanding|money }}</div>
+    <div class="s">{{ counters.unpaid }} facture(s) ouverte(s)</div>
+  </div>
+
+  <section class="tile span7">
+    <div class="tile-h"><h2>Capacité par offre</h2><span class="sub">instances encore plaçables</span></div>
     <div class="table-wrap">
       <table class="table">
         <thead><tr><th>Offre</th><th class="num">vCPU</th><th class="num">RAM</th><th class="num">Disque</th><th class="num">Reste</th></tr></thead>
         <tbody>
           {% for plan in plans %}
           <tr>
-            <td>{{ plan['name'] }} <span class="tiny dim mono">{{ plan['slug'] }}</span></td>
+            <td>{{ plan['name'] }} <span class="slug">{{ plan['slug'] }}</span></td>
             <td class="num">{{ plan['vcpu'] }}</td>
             <td class="num">{{ plan['memory_mb']|human_mb }}</td>
             <td class="num">{{ plan['disk_gb'] }} GB</td>
@@ -86,10 +109,10 @@
         </tbody>
       </table>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <div class="card-h"><h2>Services</h2><span class="sub">état des dépendances</span></div>
+  <section class="tile span5">
+    <div class="tile-h"><h2>Services</h2><span class="sub">état des dépendances</span></div>
     <dl class="kv">
       <dt>Hyperviseur</dt>
       <dd>{% if info.reachable %}<span class="badge ok"><span class="dot"></span>Incus {{ info.incus_version }}</span>
@@ -98,8 +121,8 @@
       <dd>{% if caddy_ok %}<span class="badge ok"><span class="dot"></span>Caddy</span> <span class="tiny dim">{{ caddy_detail }}</span>
           {% else %}<span class="badge bad"><span class="dot"></span>Caddy</span> <span class="tiny dim">{{ caddy_detail }}</span>{% endif %}</dd>
       <dt>Provisionnement</dt>
-      <dd>{% if running_jobs %}<span class="badge warn">{{ running_jobs }} tâche(s) en cours</span>
-          {% else %}<span class="badge idle">au repos</span>{% endif %}</dd>
+      <dd>{% if running_jobs %}<span class="badge warn"><span class="dot hatch"></span>{{ running_jobs }} tâche(s) en cours</span>
+          {% else %}<span class="badge idle"><span class="dot ring"></span>au repos</span>{% endif %}</dd>
       <dt>Pool de stockage</dt>
       <dd class="mono small">{{ info.pool_name }} · {{ info.pool_used_gb }} / {{ info.pool_total_gb }} GB utilisés</dd>
     </dl>
@@ -110,28 +133,29 @@
       </form>
       <a class="btn btn-sm" href="/admin/settings">Réglages</a>
     </div>
-  </div>
-</div>
+  </section>
 
-<div class="card">
-  <div class="card-h"><h2>Activité récente</h2><a class="small" href="/admin/activity">Tout voir</a></div>
-  {% if activity %}
-  <div class="timeline">
-    {% for event in activity %}
-    <div class="item">
-      <span class="when">{{ event['created_at'][:16].replace('T', ' ') }}</span>
-      <span class="grow">
-        <span class="what">{{ event['action'] }}</span>
-        {% if event['target'] %}<span class="dim"> · {{ event['target'] }}</span>{% endif %}
-        {% if event['detail'] %}<div class="tiny dim">{{ event['detail'][:180] }}</div>{% endif %}
-      </span>
-      <span class="who">{{ event['email'] or 'système' }}</span>
+  <section class="tile span12">
+    <div class="tile-h"><h2>Activité récente</h2><a class="btn btn-sm btn-ghost" href="/admin/activity">Tout voir</a></div>
+    {% if activity %}
+    <div class="timeline">
+      {% for event in activity %}
+      <div class="item">
+        <span class="when">{{ event['created_at'][:16].replace('T', ' ') }}</span>
+        <span class="grow">
+          <span class="what">{{ event['action'] }}</span>
+          {% if event['target'] %}<span class="dim"> · {{ event['target'] }}</span>{% endif %}
+          {% if event['detail'] %}<div class="tiny dim">{{ event['detail'][:180] }}</div>{% endif %}
+        </span>
+        <span class="who">{{ event['email'] or 'système' }}</span>
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <p class="small dim">Aucune activité enregistrée.</p>
-  {% endif %}
+    {% else %}
+    <p class="small dim">Aucune activité enregistrée.</p>
+    {% endif %}
+  </section>
+
 </div>
 
 {% endblock %}

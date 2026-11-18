@@ -1,78 +1,188 @@
-{# The addresses card, as one fragment. Every action that changes an address -
-   renaming one, choosing which is main, changing the simple subdomain - also
-   changes the summary above the list, so the card is swapped whole. #}
+{# Une seule carte, une seule liste : une ligne par adresse. Celles qui
+   existent, puis celles qu'un port à l'écoute obtiendrait. Avant, deux listes
+   parlaient des mêmes lignes de route - la liste de services (« Rendre
+   accessible », « Dépublier ») et la table d'adresses (« Retirer »,
+   « Principale »).
 
-<div class="mode">
-  <div class="mode-head">
-    <span class="pill">Simple</span>
-    <div>
-      <div class="mode-title">Votre adresse en {{ tenant_domain }}</div>
-      <div class="tiny dim">Elle existe dès la création, avec HTTPS. Rien à configurer.</div>
+   L'état est en tête de ligne, et la publication n'a qu'un verbe : `Publier`
+   / `Dépublier`, apparié au fait que la route existe ou non. `Définir
+   principale` ne se confond plus avec le badge `principale`.
+
+   Chaque action répond un fragment de ce partiel : c'est ce qui permet de
+   renommer une adresse ou d'en publier une sans recharger la page, donc sans
+   emporter la session du terminal. #}
+
+{% set listening = found|map(attribute='port')|list %}
+
+{# Le titre, le compte et le bouton de détection font partie du fragment : ils
+   décrivent la liste, et une action qui change la liste doit changer le
+   compte avec elle. #}
+<div class="tile-h">
+  <h2>Adresses web</h2>
+  <span class="sub">{{ site_rows|length }} adresse{{ 's' if site_rows|length > 1 }}{% if scanned %} · {{ found|length }} service{{ 's' if found|length > 1 }}{% endif %}</span>
+  <button class="btn btn-sm btn-ghost" title="Relancer la détection maintenant"
+          hx-get="/app/instances/{{ instance['id'] }}/services"
+          hx-target="#instance-addresses" hx-swap="innerHTML transition:false"
+          hx-indicator="#svc-busy">
+    <span id="svc-busy" class="spinner htmx-indicator" aria-hidden="true"></span>Rafraîchir
+  </button>
+</div>
+
+<div class="addr-head">
+  <span class="tiny dim">Votre adresse existe dès la création, avec HTTPS. Rien à configurer.</span>
+  <span class="tiny dim">une ligne par adresse · ce qui écoute dans votre instance est détecté automatiquement</span>
+</div>
+
+<div class="addr-list">
+
+  {% for s in site_rows %}
+  {# `scanned=False` : la détection n'a pas été payée pour ce rendu (actions sur
+     une adresse, rendu de la page). On ne prétend alors rien sur ce qui
+     écoute — « rien à l'écoute » serait un mensonge, pas une absence. #}
+  {% set svc = (found|selectattr('port', 'equalto', s['upstream'])|list|first) if scanned else none %}
+  {% set is_tenant = s['domain'].endswith('.' + tenant_domain) %}
+  {% set is_main = default_site and s['id'] == default_site['id'] %}
+  {% set label = s['domain'][:-(tenant_domain|length + 1)] if is_tenant else s['domain'] %}
+  <div class="addr-row">
+    <div class="addr-state">
+      <span class="badge ok"><span class="dot"></span>publié</span>
+      {% if is_main %}<span class="badge idle">principale</span>{% endif %}
+    </div>
+    <div class="addr-who">
+      <a class="addr-main mono" href="https://{{ s['domain'] }}" target="_blank" rel="noopener"
+         ><span class="addr-label">{{ label }}</span>{% if is_tenant %}<span class="addr-zone">.{{ tenant_domain }}</span>{% endif %}</a>
+      <div class="addr-meta">
+        <span class="tiny dim mono">port {{ s['upstream'] }}{% if scanned %} ·{% if not svc %} rien à l'écoute{% elif svc['web'] %} site web{% else %} autre service{% endif %}{% endif %}</span>
+        <span class="badge ok">HTTPS</span>
+      </div>
+      {% if scanned and not svc %}
+      <div class="addr-caution">
+        Rien n'écoute sur le port {{ s['upstream'] }}&nbsp;: cette adresse renvoie une erreur 502.
+        C'est le cas quand on déclare une adresse avant d'avoir lancé le service qui doit y répondre.
+      </div>
+      {% endif %}
+    </div>
+    <div class="addr-actions">
+      <button class="btn btn-sm btn-ghost" data-copy="https://{{ s['domain'] }}"
+              title="Copier l'adresse">Copier</button>
+
+      {% if is_main and is_tenant %}
+      {# Le sous-domaine de l'adresse principale. Modifié en place : l'ancienne
+         cesse de fonctionner, le certificat suit tout seul. #}
+      <details class="inline-edit">
+        <summary>Changer le sous-domaine</summary>
+        <form method="post" action="/app/instances/{{ instance['id'] }}/subdomain"
+              hx-post="/app/instances/{{ instance['id'] }}/subdomain"
+              hx-target="#instance-addresses" hx-swap="innerHTML">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="row tight">
+            <input class="input input-sm mono" name="label" aria-label="Sous-domaine"
+                   value="{{ label }}" style="width:9rem" spellcheck="false" autocapitalize="off">
+            <span class="dim mono tiny">.{{ tenant_domain }}</span>
+            <button class="btn btn-sm">Renommer</button>
+          </div>
+          <span class="hint">L'ancienne adresse cesse de fonctionner. Le certificat suit automatiquement.</span>
+        </form>
+      </details>
+      {% elif is_tenant %}
+      {# Une seconde adresse en .{{ tenant_domain }} : renommée en place plutôt
+         que retirée puis recréée, ce qui la couperait le temps que Caddy
+         recharge. #}
+      <details class="inline-edit">
+        <summary title="Renommer cette adresse">Renommer</summary>
+        <form method="post" action="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+              hx-post="/app/instances/{{ instance['id'] }}/sites/{{ s['id'] }}/rename"
+              hx-target="#instance-addresses" hx-swap="innerHTML">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="row tight">
+            <input class="input input-sm mono" name="label" aria-label="Nom de l'adresse"
+                   value="{{ label }}" style="width:9rem" spellcheck="false" autocapitalize="off">
+            <span class="dim mono tiny">.{{ tenant_domain }}</span>
+            <button class="btn btn-sm">Renommer</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+
+      {% if not is_main %}
+      <form method="post" action="/app/sites/{{ s['id'] }}/primary" class="inline-form"
+            hx-post="/app/sites/{{ s['id'] }}/primary"
+            hx-target="#instance-addresses" hx-swap="innerHTML">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-sm btn-ghost"
+                title="Afficher cette adresse dans la partie simple">Définir principale</button>
+      </form>
+      {% endif %}
+
+      <form method="post" action="/app/sites/{{ s['id'] }}/delete" class="inline-form"
+            hx-post="/app/sites/{{ s['id'] }}/delete"
+            hx-target="#instance-addresses" hx-swap="innerHTML"
+            hx-confirm="Dépublier {{ s['domain'] }} ? L'adresse cessera de répondre.">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-sm btn-ghost">Dépublier</button>
+      </form>
     </div>
   </div>
+  {% endfor %}
 
-  {% if default_site %}
-  {# The address is what this card is about, so it gets the room: the label in
-     the accent colour, the shared domain dimmed behind it, what it is served
-     with pushed to the right, and one button. The copy button used to be
-     floated over a code box with negative margins to tuck it inside the
-     padding. #}
-  {% set is_tenant = default_site['domain'].endswith('.' + tenant_domain) %}
-  {% set label = default_site['domain'][:-(tenant_domain|length + 1)] if is_tenant
-                 else default_site['domain'] %}
-  <div class="addr-card">
-    <a class="addr-main mono" href="https://{{ default_site['domain'] }}" target="_blank" rel="noopener">
-      <span class="addr-label">{{ label }}</span>{% if is_tenant %}<span class="addr-zone">.{{ tenant_domain }}</span>{% endif %}
-    </a>
-    <span class="addr-tags">
-      <span class="badge ok">HTTPS</span>
-      <span class="badge idle">port {{ default_site['upstream'] }}</span>
-    </span>
-    <button class="btn btn-sm btn-ghost" data-copy="https://{{ default_site['domain'] }}"
-            title="Copier l'adresse">Copier</button>
-  </div>
-
-  {% if is_tenant %}
-  <details class="inline-edit mt2">
-    <summary>Changer le sous-domaine</summary>
-    {# In place, like every other action on this page: a full reload takes the
-       terminal session down with it. #}
-    <form method="post" action="/app/instances/{{ instance['id'] }}/subdomain" class="mt1"
-          hx-post="/app/instances/{{ instance['id'] }}/subdomain"
-          hx-target="#instance-addresses" hx-swap="innerHTML">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <div class="row tight">
-        <input class="input input-sm mono" name="label" aria-label="Sous-domaine"
-               value="{{ label }}" style="width:11rem" spellcheck="false" autocapitalize="off">
-        <span class="dim mono tiny">.{{ tenant_domain }}</span>
-        <button class="btn btn-sm">Renommer</button>
+  {# Ce qui écoute et n'est pas encore publié. L'adresse annoncée est celle que
+     la publication créera : `services.address_for` garde le nom simple sur les
+     ports 80 et 443, et suffixe le port au-delà. #}
+  {% for s in found if s['port'] not in published %}
+  {% set label = instance['slug'] if s['port'] in (80, 443) else instance['slug'] ~ '-' ~ s['port'] %}
+  <div class="addr-row">
+    <div class="addr-state">
+      {% if s['web'] %}
+      <span class="badge idle"><span class="dot ring"></span>à publier</span>
+      {% else %}
+      <span class="badge warn"><span class="dot hatch"></span>à surveiller</span>
+      {% endif %}
+    </div>
+    <div class="addr-who">
+      <span class="addr-main mono pending">{{ label }}.{{ tenant_domain }}</span>
+      <div class="addr-meta">
+        <span class="tiny dim mono">port {{ s['port'] }} ·{% if s['web'] %} site web{% else %} autre service{% endif %}</span>
+        <span class="tiny dim">{% if s['web'] %}Répond en HTTP{% else %}Ne répond pas en HTTP{% if s['caution'] %} · {{ s['caution'] }}{% endif %}{% endif %}</span>
       </div>
-      <span class="hint">L'ancienne adresse cesse de fonctionner. Le certificat suit automatiquement.</span>
-    </form>
-  </details>
+      {% if not s['web'] %}
+      <div class="addr-caution">
+        À n'exposer qu'en connaissance de cause&nbsp;: rien ne répond en HTTP, donc le routage
+        ne fonctionnera pas pour un protocole propre.
+      </div>
+      {% endif %}
+    </div>
+    <div class="addr-actions">
+      <form method="post" action="/app/instances/{{ instance['id'] }}/services/publish" class="inline-form"
+            hx-post="/app/instances/{{ instance['id'] }}/services/publish"
+            hx-target="#instance-addresses" hx-swap="innerHTML">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="port" value="{{ s['port'] }}">
+        <button class="btn btn-sm {{ '' if s['caution'] else 'btn-primary' }}">Publier</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if not site_rows and not found %}
+  <p class="small dim">
+    Rien n'écoute pour l'instant dans cette instance. Lancez votre service — par
+    exemple <span class="mono">docker run -d -p 8080:80 nginx</span> — puis rechargez
+    cette page&nbsp;: il apparaîtra ici tout seul.
+  </p>
   {% endif %}
-  {% else %}
-    <p class="small muted mt2">
-      Ce modèle n'expose pas encore de serveur web, il n'y a donc rien à router.
-      Installez-en un (ou choisissez un autre modèle) puis créez l'adresse.
-    </p>
-    <form method="post" action="/app/instances/{{ instance['id'] }}/sites" class="mt2">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="domain" value="{{ instance['slug'] }}.{{ tenant_domain }}">
-      <input type="hidden" name="upstream" value="80">
-      <button class="btn btn-sm">Créer {{ instance['slug'] }}.{{ tenant_domain }}</button>
-    </form>
-  {% endif %}
+
 </div>
 
-{# The route list stays on screen. It used to sit inside the advanced section,
-   so an instance with a single address showed no routing at all. #}
-<div class="mt3" id="instance-routes"
-     style="border-top:1px solid var(--border);padding-top:16px">
-  {% include "partials/instance_routes.html" %}
-</div>
+<p class="tiny dim mt3">
+  Un service rendu accessible répond en HTTPS sur son adresse&nbsp;: le certificat est
+  automatique, et vous pouvez le retirer à tout moment.
+</p>
+<p class="tiny dim mt1">
+  Ce routage ne transporte que HTTP et HTTPS. Un service à protocole propre — un
+  serveur de jeu, une base de données, du SSH — n'y passera pas, même publié.
+</p>
 
-<details class="advanced mt3">
+<details class="advanced">
   <summary>Mode avancé — utiliser un nom de domaine à vous</summary>
   <p class="small muted mt2">
     Déclarez votre domaine ci-dessous, puis créez chez votre registrar les enregistrements
