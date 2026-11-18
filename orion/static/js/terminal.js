@@ -281,13 +281,13 @@
     const usable = pane.clientWidth - (parseFloat(style.paddingLeft) || 0)
       - (parseFloat(style.paddingRight) || 0);
     const cols = Math.max(20, Math.floor(usable / cellW));
-    // Plein écran : la cible devient la fenêtre, moins le chrome et le dégagement
-    // du bas — les termes du calcul de hauteur, pour que le panneau remplisse
-    // sans jamais dépasser. Les 8 px couvrent l'offset du moteur mesuré plus bas.
-    // Jamais `pane.clientHeight` : c'est la valeur écrite en fin de fonction, et
-    // la relire est la boucle qui replie le panneau une rangée à la fois.
+    // Plein écran : le navigateur impose sa hauteur au panneau, donc celle écrite
+    // ici est ignorée et c'est `clientHeight` qui dit la place réelle — la lire ne
+    // referme pas la boucle, puisqu'elle n'est pas la valeur qu'on écrit. Hors
+    // plein écran, on garde la cible fixe de la maquette, précisément pour cette
+    // raison : un panneau qui se relit se replie une rangée à la fois.
     const target = document.fullscreenElement === pane
-      ? window.innerHeight - fixed - (BASE_PAD + EXTRA_ROWS * cellH) - 8
+      ? pane.clientHeight - (BASE_PAD + EXTRA_ROWS * cellH)
       : TARGET_HEIGHT;
     const rows = Math.max(2, Math.floor((target - fixed) / cellH));
 
