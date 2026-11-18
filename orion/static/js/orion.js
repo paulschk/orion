@@ -110,8 +110,14 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
   if (known === undefined || known === next) return;
   if (next === 'running' || next === 'error') {
     // The sections that only make sense on a live instance (terminal, SSH
-    // details, snapshots) are server-rendered, so reload exactly once here.
-    window.location.reload();
+    // details, snapshots) are server-rendered, so fetch the page once here —
+    // through htmx rather than `location.reload()`, so the shell is refreshed
+    // without tearing the document down.
+    if (window.htmx) {
+      htmx.ajax('GET', window.location.pathname, { target: '#shell', swap: 'outerHTML' });
+    } else {
+      window.location.reload();
+    }
   }
 });
 
@@ -119,22 +125,31 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 // App shell: below the breakpoint the sidebar is an off-canvas drawer opened
 // from the burger in the top bar. It used to wrap into a cramped row of links.
 (function () {
-  var toggle = document.getElementById('side-toggle');
   var side = document.getElementById('side');
   var scrim = document.getElementById('side-scrim');
-  if (!toggle || !side) return;
+  if (!side) return;
 
   function setOpen(open) {
     side.classList.toggle('open', open);
     if (scrim) scrim.classList.toggle('open', open);
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    toggle.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+    var button = document.getElementById('side-toggle');
+    if (button) {
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      button.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+    }
     document.body.style.overflow = open ? 'hidden' : '';
   }
   function close() { setOpen(false); }
 
-  toggle.addEventListener('click', function (e) {
-    e.stopPropagation();
+  // Le bouton habite la barre de titre, que htmx remplace à chaque navigation :
+  // un écouteur posé sur lui disparaîtrait au premier clic. On écoute donc au
+  // niveau du document, où l'on survit aux remplacements. Le reste (le voile, le
+  // clic sur un lien, Échap, le passage en grand écran) vit hors de la coquille
+  // et garde ses écouteurs directs.
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest && event.target.closest('#side-toggle');
+    if (!button) return;
+    event.stopPropagation();
     setOpen(!side.classList.contains('open'));
   });
   if (scrim) scrim.addEventListener('click', close);
@@ -148,6 +163,21 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
   if (wide.addEventListener) wide.addEventListener('change', close);
   else if (wide.addListener) wide.addListener(close);
   close();
+})();
+
+// La coquille est remplacée à chaque navigation, et le remplacement renvoie le
+// corps de la colonne en haut : le menu sautait donc à chaque clic. On note sa
+// position avant, on la remet après.
+(function () {
+  var remembered = 0;
+  document.body.addEventListener('htmx:beforeSwap', function () {
+    var body = document.querySelector('.side .nav-body');
+    remembered = body ? body.scrollTop : 0;
+  });
+  document.body.addEventListener('htmx:afterSwap', function () {
+    var body = document.querySelector('.side .nav-body');
+    if (body && remembered) body.scrollTop = remembered;
+  });
 })();
 
 // The provisioning loader is replaced every couple of seconds. Two things have

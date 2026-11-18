@@ -363,6 +363,19 @@
     document.fonts.ready.then(fitToWholeRows).catch(function () {});
   }
 
+  // La coquille est remplacée par htmx, pas rechargée : le module renaît sur la
+  // page d'arrivée, et sans ceci l'ancien laisserait sa session ouverte sur
+  // l'instance qu'on vient de quitter — un shell qui tourne pour personne. On
+  // ferme donc au moment du remplacement, une fois les variables en portée (un
+  // module d'instance arrêtée sort plus haut et n'a rien à fermer).
+  document.body.addEventListener('htmx:beforeSwap', function () {
+    stopped = true;
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    stopKeepalive();
+    if (ws) { try { ws.close(); } catch (e) { /* déjà fermé */ } ws = null; }
+    try { term.dispose(); } catch (e) { /* le panneau disparaît de toute façon */ }
+  });
+
   fitToWholeRows();
   connect();
 })();

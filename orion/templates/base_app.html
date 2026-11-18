@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{# La feuille arrive après le premier pixel ; sans ces deux lignes le navigateur
+   peint du blanc le temps du trajet, et un thème sombre clignote à chaque
+   ouverture. `color-scheme` donne aussi des barres et des champs sombres. #}
+<meta name="color-scheme" content="dark">
+<style>html{background:#0b0c10}</style>
 <title>{% block title %}{{ app_name }}{% endblock %} — {{ brand }}</title>
 <link rel="stylesheet" href="/static/css/orion.css?v={{ asset_version }}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0c10'/><text x='16' y='23' font-size='19' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%233b82f6'>o</text></svg>">
@@ -10,11 +15,25 @@
 <script src="/static/js/orion.js?v={{ asset_version }}" defer></script>
 {% block head_extra %}{% endblock %}
 </head>
-<body>
-<div class="shell">
+<body hx-boost="true" hx-target="#shell" hx-select="#shell" hx-swap="outerHTML show:window:top">
+{# Toute la navigation du panneau passe par htmx : le document n'est plus
+   reconstruit à chaque clic, donc plus de clignotement, plus de feuille ni de
+   police à recharger, et plus de barre de défilement qui apparaît — la largeur
+   de la page ne bouge plus d'une page à l'autre.
+
+   On remplace la coquille entière, colonne comprise, et c'est délibéré : le lien
+   actif et les compteurs de la colonne viennent du rendu serveur, donc garder la
+   colonne garderait un état périmé. Ce qui n'est *pas* remplacé, c'est le corps
+   du document — la région des notifications, les polices déjà chargées, la
+   barre de défilement. Le défilement de la colonne est réappliqué après coup
+   par `orion.js`, sinon le remplacement le renverrait en haut.
+
+   Les liens qui sortent du panneau portent `hx-boost="false"`, sinon la page
+   publique viendrait s'installer dans la coquille. #}
+<div class="shell" id="shell">
   <aside class="side" id="side">
     <div class="brand">
-      <a href="/" class="logo">{{ brand }}<span class="num">Hosting</span></a>
+      <a href="/" class="logo" hx-boost="false">{{ brand }}<span class="num">Hosting</span></a>
       <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
     </div>
 
@@ -51,12 +70,14 @@
       <div class="who">{{ user['email'] }}</div>
       <a class="nav {{ 'active' if path.startswith('/app/factures') }}" href="/app/factures">Factures</a>
       <a class="nav {{ 'active' if path.startswith('/app/compte') }}" href="/app/compte">Compte</a>
-      <a class="nav" href="/logout">Déconnexion</a>
+      {# `/logout` renvoie sur la page de connexion, qui n'est pas dans cette
+         coquille : ce lien doit être un vrai chargement. #}
+      <a class="nav" href="/logout" hx-boost="false">Déconnexion</a>
     </div>
   </aside>
   <div class="side-scrim" id="side-scrim"></div>
 
-  <div class="main">
+  <div class="main" id="main">
     <header class="topbar">
       <button class="nav-toggle" type="button" id="side-toggle"
               aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="side">
@@ -84,8 +105,13 @@
       <div id="flash">{% include "partials/flash.html" %}</div>
       {% block content %}{% endblock %}
     </div>
+    {# Les scripts d'une page voyagent avec elle : une navigation par htmx
+       remplace `.main`, donc un script resté en fin de document ne serait
+       jamais exécuté en arrivant sur la page qui le demande — le terminal
+       s'ouvrirait sur une page morte. Placés ici, htmx les ré-exécute à chaque
+       arrivée, exactement comme sur un chargement complet. #}
+    {% block scripts %}{% endblock %}
   </div>
 </div>
-{% block scripts %}{% endblock %}
 </body>
 </html>
