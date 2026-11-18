@@ -1,28 +1,18 @@
-/* ==========================================================================
-   Orion — thème « 07 Node29 »
 
-   Cette feuille est le thème du prototype `07-node29` (voir
-   ~/workspace/orion-dashboard-designs/07.css) appliqué à tout le panneau :
-   ses jetons, son registre typographique (libellés en monospace capitales,
-   chiffres tabulaires, filets d'un pixel, angles à 3 px), sa coquille, son
-   bandeau, sa grille de tuiles et ses composants.
+/* ===================================================================
+   07 — NODE29
+   Synthèse demandée : le bandeau d'état de Blueprint, dans la forme de
+   celui de Mono (titre, rangées, légende), posé sur la grille de tuiles
+   de Mono, dans la palette node29 et le registre typographique de
+   Console (libellés en monospace capitales, chiffres alignés, filets
+   d'un pixel, angles à 3 px).
 
-   Deux jeux de noms cohabitent volontairement. Le prototype nomme les jetons
-   `--line`, `--ink`, `--dim`… ; les gabarits et les scripts du panneau
-   utilisent `--border`, `--text`, `--text-dim`… Les seconds sont des alias des
-   premiers : un seul jeu de valeurs, deux vocabulaires, donc ni les gabarits ni
-   le JS n'ont eu à bouger. Ne pas « nettoyer » les alias — ils portent la
-   compatibilité.
-
-   Une valeur n'est pas celle du prototype d'origine : `--text-dim` remonte de
-   #6b7280 à #7e8794. Le jeton livré mesurait 3,67:1 sur une carte et 4,04:1 sur
-   le fond, sous le seuil AA pour le texte de 11 px auquel il sert
-   (`.tiny.dim`, `.timeline .when`, `.card-h .sub`) ; celui-ci mesure 4,88:1 et
-   5,38:1.
-   ========================================================================== */
-
+   Couleur : les jetons exacts de `orion/static/css/orion.css`, à une
+   exception près — `--text-dim` remonte de #6b7280 à #7e8794, parce que
+   le jeton livré mesure 3,67:1 sur une carte et 4,04:1 sur le fond,
+   sous le seuil AA pour le texte de 11 px auquel il sert.
+   =================================================================== */
 :root{
-  /* --- les jetons du prototype --- */
   --bg:#0b0c10; --bg-alt:#111318; --card:#111827;
   --line:#1f2937; --line-soft:#171a21;
   --ink:#e0e0e0; --muted:#9ca3af; --dim:#7e8794;
@@ -34,60 +24,432 @@
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
   --r:3px;
-  --pad:28px;          /* la gouttière de la colonne de contenu */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2{font-weight:600;letter-spacing:-.01em}
+.mono{font-family:var(--mono)}.tiny{font-size:11px}.small{font-size:12.5px}
+.dim{color:var(--dim)}.muted{color:var(--muted)}.bad{color:var(--bad)}
+.mt1{margin-top:8px}.mt2{margin-top:16px}.mt3{margin-top:20px}.mb2{margin-bottom:16px}
+.grow{flex:1 1 auto;min-width:0}.strong{font-weight:600}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.tight{gap:8px}.row.end{justify-content:flex-end}
+.spread{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:14px}
+.lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
 
-  /* --- les noms hérités, alias des précédents --- */
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.side{background:var(--bg-alt);border-right:1px solid var(--line);padding:16px 12px;
+  display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.side::-webkit-scrollbar{width:8px}.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
+.brand{padding:4px 10px 16px;border-bottom:1px solid var(--line-soft)}
+.logo{font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:.02em}
+.logo span{color:var(--accent)}
+.role{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-top:5px}
+.nav-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);padding:16px 10px 6px}
+.side .nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;
+  border-radius:var(--r);color:var(--muted);font-size:13px;font-weight:500;border-left:2px solid transparent}
+.side .nav:hover{background:var(--card);color:var(--ink);text-decoration:none}
+.side .nav.active{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent)}
+.side .nav .count{font-family:var(--mono);font-size:10.5px;background:var(--tag-bg);color:var(--tag-text);
+  padding:0 6px;border-radius:999px}
+.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft)}
+.side-foot .who{font-family:var(--mono);font-size:11px;color:var(--dim);padding:0 10px 8px;word-break:break-all}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 24px;
+  border-bottom:1px solid var(--line);background:rgba(11,12,16,.9);backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:20}
+.topbar h1{font-size:16px}
+.crumb{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-top:2px}
+.topbar-actions{display:flex;gap:8px}
+.readout{display:flex;gap:14px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.content{padding:0 0 56px}
+
+/* ---- le bandeau : forme de Mono, contenu de Blueprint ---- */
+.band{background:var(--card);border-bottom:1px solid var(--line)}
+.band-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:13px 24px 9px}
+.band-head h2{font-size:13.5px}
+.band-head .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.band-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:0 24px 13px}
+.band-row + .band-row{border-top:1px solid var(--line-soft);padding-top:12px}
+.legend{display:flex;align-items:center;gap:16px;margin-left:auto;font-family:var(--mono);font-size:10px;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;flex:none}
+.legend .m-full{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.legend .m-ring{width:6px;height:6px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--dim)}
+.legend .m-warn{width:12px;height:7px;background:repeating-linear-gradient(45deg,var(--warn) 0 3px,rgba(251,191,36,.12) 3px 6px)}
+.legend .m-fail{width:6px;height:6px;border-radius:50%;background:var(--bad)}
+.gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:100%}
+.gauge-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.gauge.attn .lbl::before{content:"";display:inline-block;width:12px;height:7px;margin-right:7px;
+  background:repeating-linear-gradient(45deg,var(--warn) 0 3px,rgba(251,191,36,.12) 3px 6px)}
+.gauge-h .val{font-family:var(--mono);font-size:12px}
+.bar{height:6px;border-radius:999px;background:var(--line-soft);overflow:hidden;margin:8px 0 6px}
+.bar > span{display:block;height:100%;background:var(--accent)}
+.bar.ok > span{background:#4ade80}.bar.warn > span{background:#fbbf24}.bar.bad > span{background:#f87171}
+
+/* ---- la grille de tuiles ---- */
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;padding:16px 24px 0}
+.tile{grid-column:span 12;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px 18px;min-width:0}
+.tile-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+.tile-h h2{font-size:13.5px}
+.tile-h .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.tile-h .btn{align-self:center;margin-left:auto}
+.tile .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
+.tile .v{font-family:var(--mono);font-size:28px;font-weight:500;letter-spacing:-.02em;margin-top:7px}
+.tile .s{font-size:11.5px;color:var(--dim);margin-top:2px}
+.tile.attn{border-color:rgba(251,191,36,.34)}
+.tile.danger{border-color:#5a2b2b}
+.span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:span 5}
+.span7{grid-column:span 7}.span8{grid-column:span 8}.span12{grid-column:span 12}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;
+  padding:2px 8px;border-radius:999px;background:var(--tag-bg);color:var(--tag-text);white-space:nowrap}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.idle{background:var(--line-soft);color:var(--muted)}
+.badge.muted{background:var(--line-soft);color:var(--dim)}
+.pill{display:inline-block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+  padding:1px 7px;border-radius:var(--r);background:var(--tag-bg);color:var(--tag-text)}
+
+.kv{display:grid;grid-template-columns:minmax(122px,auto) minmax(0,1fr);gap:9px 16px;font-size:13px}
+.kv dt{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);padding-top:3px}
+.kv dd{min-width:0}
+.kv-inline{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 20px;width:100%}
+.kv-inline div{display:flex;flex-direction:column;gap:2px}
+.kv-inline .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+.kv-inline .v{font-size:13px}
+
+.table-wrap{border:1px solid var(--line-soft);border-radius:var(--r);overflow-x:auto}
+table.table{width:100%;border-collapse:collapse}
+table.table th,table.table td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line-soft)}
+table.table th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--dim);font-weight:500;background:var(--bg-alt)}
+table.table td{font-size:13px}
+table.table td.slug{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line);padding:0 5px;margin-left:6px;white-space:nowrap}
+table.table td.num,table.table th.num{text-align:right;font-family:var(--mono);font-size:12px}
+table.table tbody tr:last-child td{border-bottom:0}
+table.table tbody tr:hover{background:#151c2b}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:7px 13px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--bg-alt);color:var(--ink);font-family:inherit;font-size:12.5px;
+  font-weight:500;cursor:pointer;transition:.14s}
+.btn:hover{border-color:var(--accent);color:var(--ink)}
+.btn-sm{padding:4px 10px;font-size:11.5px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#fff}
+.btn-danger{background:transparent;border-color:#6b2b2b;color:var(--bad)}
+.btn-danger:hover{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn-ghost:hover{background:var(--bg-alt);border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.timeline{display:flex;flex-direction:column}
+.timeline .item{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:16px;align-items:baseline;
+  padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.timeline .item:last-child{border-bottom:0;padding-bottom:0}
+.timeline .when{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
+.timeline .what .target{color:var(--muted)}
+.timeline .who{font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+.term-pane{height:300px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;overflow:auto}
+.term-screen{font-family:var(--mono);font-size:12px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap}
+.term-screen .caret{color:var(--accent)}
+.job-log{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.6;color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.codebox{position:relative;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px 80px 12px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-word}
+.codebox .btn{position:absolute;top:8px;right:8px}
+
+/* ---- la partie adresses, une seule liste ---- */
+.addr-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding-bottom:10px;border-bottom:1px solid var(--line)}
+.addr-list{display:flex;flex-direction:column}
+.addr-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:16px;align-items:center;
+  padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.addr-row:last-child{border-bottom:0;padding-bottom:0}
+.addr-state{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.addr-main{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.addr-label{color:var(--accent);font-weight:600}
+.addr-zone{color:var(--dim)}
+.addr-main.pending{color:var(--dim)}
+.addr-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.addr-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.addr-caution{margin-top:4px;font-size:11px;color:var(--warn)}
+
+details summary{cursor:pointer;list-style:none;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:7px}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:"\25B8";color:var(--accent);transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details summary:hover{color:var(--ink)}
+.inline-edit > summary{text-transform:none;letter-spacing:.02em;font-size:11px;color:var(--accent)}
+.inline-edit form{margin-top:9px}
+.advanced{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+.input{width:100%;padding:8px 11px;border-radius:var(--r);background:var(--bg);border:1px solid var(--line);
+  color:var(--ink);font-family:inherit;font-size:13px}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input-sm{padding:4px 8px;font-size:12px}
+.hint{font-size:11px;color:var(--dim)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 18px}
+.list{display:flex;flex-direction:column}
+.listrow{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;padding:11px 0;
+  border-bottom:1px solid var(--line-soft)}
+.listrow:last-child{border-bottom:0;padding-bottom:0}
+@media (max-width:1180px){
+  .span3,.span4,.span5,.span7,.span8{grid-column:span 6}
+}
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;overflow:visible;border-right:0;
+    border-bottom:1px solid var(--line);padding:12px 16px;scrollbar-width:none}
+  .side::-webkit-scrollbar{height:0}
+  .brand{padding:0 14px 0 0;border-bottom:0;border-right:1px solid var(--line);margin-right:10px}
+  .brand .role{display:none}.nav-label{display:none}
+  .side .nav{white-space:nowrap;border-left:0}
+  .side-foot{margin:0 0 0 auto;padding:0 0 0 12px;border-top:0;border-left:1px solid var(--line);
+    display:flex;align-items:center;gap:4px}
+  .side-foot .who{display:none}
+  .grid{padding:12px 14px 0}
+  .tile{grid-column:span 12 !important}
+  .band-head,.band-row{padding-left:14px;padding-right:14px}
+  .readout{display:none}
+  .gauges{grid-template-columns:minmax(0,1fr);gap:14px}
+  .addr-row{grid-template-columns:minmax(0,1fr);gap:10px}
+  .addr-actions{justify-content:flex-start}
+  .term-pane{height:240px}
+  table.table td.slug{display:none}
+}
+/* ==========================================================================
+   ORION — CE QUE LE PROTOTYPE NE PORTE PAS
+   ==========================================================================
+   Tout ce qui précède cette ligne est `07.css` du prototype, mot pour mot :
+   mêmes jetons, mêmes valeurs, mêmes règles, y compris sa mise en page à
+   900 px. Rien n'a été retouché, et rien ne doit l'être — si une règle du
+   prototype doit changer, elle change dans le prototype d'abord.
+
+   Ce qui suit est l'appoint du panneau : les composants que la maquette ne
+   montre pas (alertes, chargement, coquille publique, tiroir mobile) et les
+   corrections du terminal, écrites dans le même registre — mêmes jetons,
+   mêmes filets d'un pixel, mêmes angles à 3 px, mêmes libellés en monospace
+   capitales. Aucune règle ici ne redéfinit un sélecteur du prototype, à une
+   exception près, signalée : `.term-pane`, dont la hauteur est un correctif
+   mesuré (le prototype montre 300 px, le terminal se cale sur des rangées
+   entières).
+
+   Les noms de jetons du prototype sont la source : les noms hérités du
+   panneau (`--border`, `--text`, `--text-dim`…) sont des alias, déclarés dans
+   le second bloc `:root` ci-dessous. Un seul jeu de valeurs, deux
+   vocabulaires, donc ni un gabarit ni un script n'a eu à bouger.
+   ========================================================================== */
+
+:root{
   --border:var(--line); --border-soft:var(--line-soft);
   --text:var(--ink); --text-muted:var(--muted); --text-dim:var(--dim);
   --radius:var(--r); --radius-sm:var(--r);
-  --danger:var(--bad);
+  --danger:var(--bad); --bg-soft:var(--bg-alt);
 }
 
-/* ----------------------------------------------------------------- base */
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;
-  line-height:1.55;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-h1,h2,h3{font-weight:600;letter-spacing:-.01em}
-img{max-width:100%}
-::selection{background:var(--accent-soft);color:var(--ink)}
-
-.mono{font-family:var(--mono)}
-.tiny{font-size:11px}
-.small{font-size:12.5px}
-.dim{color:var(--dim)}
-.muted{color:var(--muted)}
-.bad{color:var(--bad)}
-.ok{color:var(--ok)}
-.strong{font-weight:600}
+/* -------------------------------------------------------- utilitaires en plus */
 .right{text-align:right}
 .center{text-align:center}
 .nowrap{white-space:nowrap}
-.grow{flex:1 1 auto;min-width:0}
 .push{margin-left:auto}
 .mt0{margin-top:0}
-.mt1{margin-top:8px}
-.mt2{margin-top:16px}
-.mt3{margin-top:24px}
 .mb1{margin-bottom:8px}
-.mb2{margin-bottom:16px}
 .mb3{margin-bottom:24px}
-
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.row.tight{gap:8px}
-.row.end{justify-content:flex-end}
-.spread{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.stack{display:flex;flex-direction:column;gap:14px}
-.inline-form{display:inline}
-.lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
 .pct,.path{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.inline-form{display:inline}
+.kv dd.mono{font-family:var(--mono);font-size:12.5px}
+#flash > .alert{margin:16px 24px 0}
 
-/* ------------------------------------------------------------------ motion */
-/* The same feel as nestor.ink: a short fade-in-up, a drifting hero glow, and
-   sections that rise as they enter the viewport. Everything degrades to static
-   HTML if the script never runs. */
+/* ---------------------------------------------- la coquille du panneau */
+/* The prototype's `.side-foot` under the name this shell uses. */
+.side .foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft)}
+.side .foot .who{font-family:var(--mono);font-size:11px;color:var(--dim);padding:0 10px 8px;word-break:break-all}
+/* Le prototype pose `.logo` sur un bloc ; ici c'est un lien, donc sans cette
+   ligne il hérite de la couleur d'accent au lieu de l'encre. */
+.logo{color:var(--ink)}
+.topbar-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0}
+.topbar-sub{min-width:0}
+.topbar .breadcrumb{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .breadcrumb a{color:var(--dim);text-decoration:none}
+.topbar .breadcrumb a:hover{color:var(--accent);text-decoration:none}
+.topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.content.narrow{max-width:900px}
+/* The page's own actions live in the title bar on a wide screen; on a phone the
+   title bar carries the menu button and the heading only, so they move to the
+   top of the content instead. Nothing at all when the page has none. */
+.content-actions{display:none}
+.content-actions .btn{flex:1 1 auto;justify-content:center}
+.side-scrim{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.5);
+  opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s}
+.side-scrim.open{opacity:1;visibility:visible}
+/* A page that is a single card — the prototype's pages are all grids and bands —
+   keeps the gutter the grid would have given it. */
+.content > .card,.content > .alert,.content > .empty,.content > .stack,
+.content > .table-wrap{margin:16px 24px 0}
+.content-row{padding:16px 24px 0}
+.band-note{font-size:11px;color:var(--dim)}
+/* The plan reference as the admin dashboard prints it (the prototype styles the
+   table cell, this is the same thing beside a title). */
+.slug{font-family:var(--mono);font-size:10.5px;color:var(--dim);border:1px solid var(--line);
+  border-radius:var(--r);padding:0 5px;margin-left:6px;white-space:nowrap}
+/* Ring = at rest, hatched = needs watching: the vocabulary of the legend and the
+   gauges, on the badges that report a service's state. */
+.badge .dot.ring{background:none;box-shadow:inset 0 0 0 1px currentColor}
+.badge .dot.hatch{width:11px;height:7px;border-radius:1px;background:none;
+  background-image:repeating-linear-gradient(45deg,currentColor 0 3px,transparent 3px 6px)}
+
+/* ---------------------------------------------------------- cards et chiffres */
+/* `.card` is the tile under the name the pages that predate the grid already
+   use: a page is on the theme before it is re-laid out. */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px 18px}
+.card.tight{padding:14px 16px}
+.card.flat{background:var(--bg-alt)}
+.card.link:hover{border-color:var(--accent)}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-h h2,.card-h h3{font-size:13.5px}
+.card-h .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+.stat .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
+.stat .v{font-family:var(--mono);font-size:28px;font-weight:500;letter-spacing:-.02em;margin-top:7px}
+.stat .v small{font-size:13px;font-weight:500;color:var(--muted)}
+.stat.accent .v{color:var(--accent)}
+.stat.bad .v{color:var(--bad)}
+.stat.warn .v{color:var(--warn)}
+.empty{padding:40px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);
+  border-radius:var(--r);background:var(--bg-alt)}
+.empty h3{font-size:13.5px;margin-bottom:6px;color:var(--ink)}
+
+/* ------------------------------------------------------------- alertes */
+.alert{padding:11px 15px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);
+  font-family:var(--mono);font-size:12px}
+.alert.ok{border-color:#2f5d3f;background:var(--ok-bg);color:var(--ok)}
+.alert.err{border-color:#6b2b2b;background:var(--bad-bg);color:var(--bad)}
+.alert.info{background:var(--accent-soft);border-color:var(--line);color:var(--tag-text)}
+.alert.mono{font-family:var(--mono)}
+
+/* ------------------------------------------------- chargement et étapes */
+.loader{animation:orion-fade-in .35s ease-out}
+.loader-head{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:600}
+.loader-head .loader-step{flex:1 1 auto;color:var(--ink)}
+.loader-head .loader-pct{color:var(--accent);font-size:11.5px}
+.loader-count{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap}
+.spinner{width:13px;height:13px;border-radius:50%;flex:none;border:2px solid var(--line);
+  border-top-color:var(--accent);animation:orion-spin .8s linear infinite}
+.htmx-indicator{opacity:0;transition:opacity .15s ease-in}
+.htmx-request .htmx-indicator,.htmx-request.htmx-indicator{opacity:1}
+#svc-busy{width:11px;height:11px;margin-right:5px;vertical-align:-1px}
+.loader-log{margin-top:12px;height:8.5rem;overflow-y:auto;background:var(--bg);border:1px solid var(--line);
+  border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:11.5px;line-height:1.55;
+  color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.loader-log::-webkit-scrollbar{width:8px}
+.loader-log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.steps{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:5px}
+.steps li{font-size:11.5px;color:var(--dim);display:flex;gap:8px;align-items:baseline}
+.steps li.done{color:var(--muted)}
+.steps li .tick{color:var(--ok);font-size:11px}
+.steps li.current{color:var(--ink)}
+.steps li.current .tick{color:var(--accent);animation:orion-pulse 1.4s ease-in-out infinite}
+.fade-swap.htmx-swapping{opacity:.35;transition:opacity .12s ease-out}
+.htmx-added{animation:orion-fade-in .25s ease-out}
+#instance-status{min-height:3.5rem}
+/* The status fragment is re-fetched every couple of seconds while a machine is
+   being built, the gauges every ten, the address list every minute. Without
+   this the arrival animation replays on every poll and the page looks as though
+   it were reloading itself. */
+#instance-status .loader,
+#instance-status .htmx-added,
+#instance-status .htmx-added *,
+#instance-metrics .htmx-added,
+#instance-metrics .htmx-added *,
+#instance-addresses .htmx-added,
+#instance-addresses .htmx-added *{animation:none}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
+
+/* ============================================================== TERMINAL
+   Les correctifs mesurés, à conserver tels quels :
+
+   - la hauteur du panneau est écrite par terminal.js, calée sur des rangées
+     entières, à partir d'une cible FIXE et du chrome mesuré (padding ET
+     bordures) — lire la hauteur qu'on s'apprête à écrire referme la boucle qui
+     repliait le terminal d'une ligne à chaque passage. La valeur ci-dessous
+     n'est là que pour la première peinture ;
+   - aucun ascenseur, sur les DEUX couches : xterm 5.5 rend `.xterm` lui-même
+     défilable, et la barre native de 17 px s'y installait alors que
+     `.xterm-viewport` était déjà propre ;
+   - la marge sous la dernière rangée appartient au padding BAS du panneau, pas
+     à l'intérieur de `.xterm` : le viewport s'étire sur son conteneur, donc une
+     réserve posée à l'intérieur place le pied de la zone défilante sous la
+     dernière ligne ;
+   - le journal de provisionnement s'appelle `.job-log` et jamais `.terminal` :
+     `.terminal` est la classe que xterm pose sur sa propre racine, et une règle
+     de ce nom redimensionnait le terminal lui-même. */
+.term-pane{height:460px;position:relative}
+.term-pane .xterm{height:100%;width:100%;padding:0;border:0;max-height:none;background:transparent;
+  overflow:hidden;scrollbar-width:none;-ms-overflow-style:none}
+.term-pane .xterm-viewport{background:transparent !important}
+.term-pane .xterm::-webkit-scrollbar{width:0;height:0}
+.term-pane .xterm-viewport::-webkit-scrollbar{width:0;height:0}
+.term-jump{position:absolute;right:14px;bottom:12px;z-index:3;font:inherit;font-size:11px;line-height:1.4;
+  padding:4px 10px;cursor:pointer;color:var(--accent);background:rgba(11,12,16,.94);
+  border:1px solid var(--line);border-radius:999px}
+.term-jump:hover{border-color:var(--accent)}
+#terminal-status.ok{color:var(--ok)}
+#terminal-status.bad{color:var(--bad)}
+.job-log{background:#05070d;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.6;max-height:420px;overflow:auto;
+  white-space:pre-wrap;word-break:break-word;color:var(--muted)}
+.job-log .err{color:var(--bad)}
+
+/* ------------------------------------------------ formulaires en plus */
+/* `appearance: none` n'est pas posé par le prototype (il ne montre pas de
+   liste déroulante) : quand on le pose, le contrôle doit porter son propre
+   chevron, sinon il n'en a plus. */
+select.input{appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:11px}
+textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size:11.5px}
+.checkline{display:flex;align-items:center;gap:9px;font-size:13px}
+.checkline input{width:16px;height:16px;accent-color:var(--accent)}
+.tpl-pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.tpl{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--bg-alt);
+  cursor:pointer;display:block;position:relative}
+.tpl:hover{border-color:var(--accent)}
+.tpl input{position:absolute;opacity:0;pointer-events:none}
+.tpl.sel{border-color:var(--accent);background:var(--accent-soft)}
+.tpl .t{font-weight:600;font-size:12.5px;margin-bottom:4px}
+.tpl .d{font-size:11.5px;color:var(--muted)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs a{padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--muted);
+  border-bottom:2px solid transparent;text-decoration:none}
+.tabs a:hover{color:var(--ink);text-decoration:none}
+.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* -------------------------------------------------- liste d'adresses en plus */
+.addr-who{min-width:0}
+.addr-main:hover .addr-label{text-decoration:underline}
+
+/* ------------------------------------------------------------ site public */
+/* La maquette ne porte pas de site public : ces règles-là reprennent la mise en
+   page qui existait, dans le registre du prototype. */
 #main{transition:opacity .25s ease-out}
 .page-transition{animation:orion-fade-up .45s ease-out both}
 .hero{position:relative;overflow:hidden}
@@ -113,27 +475,18 @@ img{max-width:100%}
   .page-transition,.section-dot,.htmx-added,.loader{animation:none}
   .hero-glow{display:none}
 }
-
-/* ------------------------------------------------------- public shell (.pnav) */
 .pnav{position:sticky;top:0;z-index:50;background:rgba(11,12,16,.92);
   backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
   transition:background-color .25s ease,border-color .25s ease,backdrop-filter .25s ease}
 .pnav.scrolled{background:rgba(11,12,16,.82);backdrop-filter:blur(12px);border-bottom-color:var(--line)}
 .pnav .container{display:flex;align-items:center;justify-content:space-between;height:62px}
-.logo{font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:.02em;color:var(--ink)}
-.logo .num{color:var(--accent)}
 .pnav nav{display:flex;gap:24px;align-items:center}
 /* Scoped with `a:not(.btn)`: a bare `.pnav nav a` outweighs `.btn-primary`, so
-   the header's call to action used to inherit the nav's grey and its weight —
-   a grey label on a blue button. */
+   the header's call to action used to inherit the nav's grey and its weight. */
 .pnav nav a:not(.btn){color:var(--muted);font-size:12.5px;font-weight:500;text-decoration:none}
 .pnav nav a:not(.btn):hover,.pnav nav a:not(.btn).active{color:var(--ink)}
-.container{max-width:1140px;margin:0 auto;padding:0 var(--pad)}
+.container{max-width:1140px;margin:0 auto;padding:0 24px}
 .narrow{max-width:780px}
-
-/* --------------------------------------------------------------- burger */
-/* One control for both shells: three bars that fold into a cross when open.
-   Hidden by default; each layout reveals it at its own breakpoint. */
 .nav-toggle{display:none;background:none;border:0;cursor:pointer;padding:9px;margin:-9px 0 -9px -9px;
   border-radius:var(--r);color:var(--ink);line-height:0}
 .nav-toggle:hover{background:var(--accent-soft)}
@@ -147,394 +500,6 @@ img{max-width:100%}
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(1){top:6px;transform:rotate(45deg)}
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(2){opacity:0}
 .nav-toggle[aria-expanded="true"] .bars i:nth-child(3){top:6px;transform:rotate(-45deg)}
-
-/* ------------------------------------------------------------- app shell */
-.shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
-.side{background:var(--bg-alt);border-right:1px solid var(--line);padding:16px 12px;
-  display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto;
-  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-.side::-webkit-scrollbar{width:8px}
-.side::-webkit-scrollbar-track{background:transparent}
-.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
-.side::-webkit-scrollbar-thumb:hover{background:var(--tag-bg)}
-.side .brand{padding:4px 10px 16px;border-bottom:1px solid var(--line-soft)}
-.side .brand .logo{font-size:14px}
-.side .brand .role{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--dim);margin-top:5px}
-.side .nav-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;
-  color:var(--dim);padding:16px 10px 6px}
-.side a.nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;
-  border-radius:var(--r);color:var(--muted);font-size:13px;font-weight:500;
-  border-left:2px solid transparent;text-decoration:none}
-.side a.nav:hover{background:var(--card);color:var(--ink);text-decoration:none}
-.side a.nav.active{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent)}
-.side a.nav .count{font-family:var(--mono);font-size:10.5px;background:var(--tag-bg);color:var(--tag-text);
-  padding:0 6px;border-radius:999px}
-.side .foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft)}
-.side .foot .who{font-family:var(--mono);font-size:11px;color:var(--dim);padding:0 10px 8px;word-break:break-all}
-
-.main{min-width:0;display:flex;flex-direction:column}
-.topbar{display:flex;align-items:center;gap:18px;padding:12px var(--pad);border-bottom:1px solid var(--line);
-  background:rgba(11,12,16,.9);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
-.topbar-titles{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0}
-.topbar-sub{min-width:0}
-.topbar h1{font-size:16px}
-.topbar .breadcrumb{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;
-  letter-spacing:.1em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topbar .breadcrumb a{color:var(--dim);text-decoration:none}
-.topbar .breadcrumb a:hover{color:var(--accent);text-decoration:none}
-.topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
-.content{padding:0 var(--pad) 56px}
-.content.narrow{max-width:900px}
-/* The page's own actions live in the title bar on a wide screen; on a phone the
-   title bar carries the menu button and the heading only, so they move to the
-   top of the content instead. Nothing at all when the page has none. */
-.content-actions{display:none}
-.content-actions .btn{flex:1 1 auto;justify-content:center}
-.side-scrim{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.5);
-  opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s}
-.side-scrim.open{opacity:1;visibility:visible}
-
-/* ------------------------------------------------------------- le bandeau */
-/* The shape is Mono's (title, rows, legend), the content is Blueprint's: the
-   machine's identity, then its quantities, each with the note that says what
-   the bar is reporting. */
-.band{background:var(--card);border-bottom:1px solid var(--line);margin:0 calc(var(--pad) * -1)}
-.band-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:13px var(--pad) 9px}
-.band-head h2{font-size:13.5px}
-.band-head .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
-.band-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:0 var(--pad) 13px}
-.band-row + .band-row{border-top:1px solid var(--line-soft);padding-top:12px}
-.band-row .push{margin-left:auto}
-.band-note{font-size:11px;color:var(--dim)}
-.legend{display:flex;align-items:center;gap:16px;margin-left:auto;font-family:var(--mono);font-size:10px;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{display:inline-block;flex:none}
-.legend .m-full{width:6px;height:6px;border-radius:50%;background:var(--ok)}
-.legend .m-ring{width:6px;height:6px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--dim)}
-.legend .m-warn{width:12px;height:7px;
-  background:repeating-linear-gradient(45deg,var(--warn) 0 3px,rgba(251,191,36,.12) 3px 6px)}
-.legend .m-fail{width:6px;height:6px;border-radius:50%;background:var(--bad)}
-
-.gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:100%}
-.gauge-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.gauge-h .val{font-family:var(--mono);font-size:12px}
-.gauge .note{font-size:11px;color:var(--dim)}
-/* The mark that means "watch this" sits *before the label*, never on the bar:
-   drawn on the bar it read as "the reserved vCPU" while the note beside it said
-   exactly that. One glyph, one meaning. */
-.gauge.attn .lbl::before{content:"";display:inline-block;width:12px;height:7px;margin-right:7px;
-  vertical-align:-1px;background:repeating-linear-gradient(45deg,var(--warn) 0 3px,rgba(251,191,36,.12) 3px 6px)}
-/* A note under the three gauges takes the whole width rather than one column:
-   the reason for a missing reading has to be readable in full. */
-.gauges > .note{grid-column:1 / -1;font-size:11px;color:var(--dim)}
-.bar{height:6px;border-radius:999px;background:var(--line-soft);overflow:hidden;margin:8px 0 6px}
-.bar > span{display:block;height:100%;background:var(--accent);transition:width .6s cubic-bezier(.4,0,.2,1)}
-.bar.ok > span{background:#4ade80}
-.bar.warn > span{background:#fbbf24}
-.bar.bad > span{background:#f87171}
-.gauges .bar{margin:8px 0 6px;height:6px}
-
-.kv-inline{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 20px;width:100%}
-.kv-inline > div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.kv-inline .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
-.kv-inline .v{font-size:13px}
-
-/* ------------------------------------------------------ la grille de tuiles */
-.grid{display:grid;gap:12px}
-/* The twelve-column layout applies only to a `.grid` that holds tiles: the
-   public pages carry a `.grid` of their own (`.cols-2`, `.cols-3`, `.cols-4`)
-   and their layout must not move. Without `:has()`, tiles stack full width — a
-   clean degradation rather than a break. */
-.grid:has(> .tile){grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;
-  padding:16px var(--pad) 0;margin:0 calc(var(--pad) * -1)}
-.grid:has(> .tile) > .tile{grid-column:span 12}
-.grid:has(> .tile) > .span3{grid-column:span 3}
-.grid:has(> .tile) > .span4{grid-column:span 4}
-.grid:has(> .tile) > .span5{grid-column:span 5}
-.grid:has(> .tile) > .span7{grid-column:span 7}
-.grid:has(> .tile) > .span8{grid-column:span 8}
-.grid:has(> .tile) > .span12{grid-column:span 12}
-/* The gutter belongs to the grid, not to the tiles: a margin on each tile
-   doubled it between neighbours (56px where the register wants 12) and made the
-   span arithmetic disagree with the prototype. */
-.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
-  padding:16px 18px 18px;min-width:0}
-.tile-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
-.tile-h h2{font-size:13.5px}
-.tile-h .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
-.tile-h .btn{align-self:center;margin-left:auto}
-.tile .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
-.tile .v{font-family:var(--mono);font-size:28px;font-weight:500;letter-spacing:-.02em;margin-top:7px}
-.tile .v small{font-size:13px;font-weight:500;color:var(--muted)}
-.tile .s{font-size:11.5px;color:var(--dim);margin-top:2px}
-.tile.attn{border-color:rgba(251,191,36,.34)}
-.tile.danger{border-color:#5a2b2b}
-.span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:span 5}
-.span7{grid-column:span 7}.span8{grid-column:span 8}.span12{grid-column:span 12}
-/* A live condition the mockup cannot show (a job running, an unreachable host),
-   on the same gutter as everything else in the column. */
-.content-row{padding:16px 0 0}
-/* A plan's reference, as it appears in the register. */
-.slug{font-family:var(--mono);font-size:10.5px;color:var(--dim);border:1px solid var(--line);
-  border-radius:var(--r);padding:0 5px;margin-left:6px;white-space:nowrap}
-
-/* --------------------------------------------------------------- badges */
-/* The register: a badge is a monospace label, not a rounded sticker. */
-.badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10.5px;
-  padding:2px 8px;border-radius:999px;background:var(--tag-bg);color:var(--tag-text);white-space:nowrap}
-.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
-.badge.ok{background:var(--ok-bg);color:var(--ok)}
-.badge.warn{background:var(--warn-bg);color:var(--warn)}
-.badge.bad{background:var(--bad-bg);color:var(--bad)}
-.badge.idle{background:var(--line-soft);color:var(--muted)}
-.badge.muted{background:var(--line-soft);color:var(--dim)}
-/* Ring = at rest, hatched = needs watching: the same vocabulary as the gauges
-   and the address rows. */
-.badge .dot.ring{background:none;box-shadow:inset 0 0 0 1px currentColor}
-.badge .dot.hatch{width:11px;height:7px;border-radius:1px;background:none;
-  background-image:repeating-linear-gradient(45deg,currentColor 0 3px,transparent 3px 6px)}
-.pill{display:inline-block;font-family:var(--mono);font-size:10px;text-transform:uppercase;
-  letter-spacing:.1em;padding:1px 7px;border-radius:var(--r);background:var(--tag-bg);color:var(--tag-text)}
-
-/* --------------------------------------------------------------- tables */
-.table-wrap{border:1px solid var(--line-soft);border-radius:var(--r);overflow-x:auto}
-table.table{width:100%;border-collapse:collapse}
-table.table th,table.table td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--line-soft)}
-table.table th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--dim);font-weight:500;background:var(--bg-alt)}
-table.table td{font-size:13px}
-table.table td.num,table.table th.num{text-align:right;font-family:var(--mono);font-size:12px}
-table.table td.slug{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line);
-  padding:0 5px;margin-left:6px;white-space:nowrap}
-table.table .id{color:var(--dim);font-family:var(--mono);font-size:11px}
-table.table tbody tr:last-child td{border-bottom:0}
-table.table tbody tr:hover{background:#151c2b}
-
-/* --------------------------------------------------------------- buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:7px 13px;
-  border-radius:var(--r);border:1px solid var(--line);background:var(--bg-alt);color:var(--ink);
-  font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;text-decoration:none;transition:.14s}
-.btn:hover{border-color:var(--accent);color:var(--ink)}
-.btn-sm{padding:4px 10px;font-size:11.5px}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn-primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#fff}
-.btn-danger{background:transparent;border-color:#6b2b2b;color:var(--bad)}
-.btn-danger:hover{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
-.btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
-.btn-ghost:hover{background:var(--bg-alt);border-color:var(--line);color:var(--ink)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-
-/* ----------------------------------------------------- cards and figures */
-/* `.card` is the tile, under the name the older pages already use: a page that
-   has not been re-laid out yet is still on the theme. */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px 20px}
-.card.tight{padding:14px 16px}
-.card.flat{background:var(--bg-alt)}
-.card.link:hover{border-color:var(--accent)}
-.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
-.card-h h2,.card-h h3{font-size:13.5px}
-.card-h .sub{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
-.stat .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
-.stat .v{font-family:var(--mono);font-size:24px;font-weight:500;letter-spacing:-.02em;margin-top:6px}
-.stat .v small{font-size:13px;font-weight:500;color:var(--muted)}
-.stat.accent .v{color:var(--accent)}
-.stat.bad .v{color:var(--bad)}
-.stat.warn .v{color:var(--warn)}
-.empty{padding:40px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);
-  border-radius:var(--r);background:var(--bg-alt)}
-.empty h3{font-size:13.5px;margin-bottom:6px;color:var(--ink)}
-
-/* --------------------------------------------------- alerts and messages */
-.alert{padding:11px 15px;border-radius:var(--r);font-size:13px;border:1px solid var(--line);
-  background:var(--card);font-family:var(--mono);font-size:12px}
-.alert.ok{border-color:#2f5d3f;background:var(--ok-bg);color:var(--ok)}
-.alert.err{border-color:#6b2b2b;background:var(--bad-bg);color:var(--bad)}
-.alert.info{background:var(--accent-soft);border-color:var(--line);color:var(--tag-text)}
-.alert.mono{font-family:var(--mono)}
-
-/* --------------------------------------------------- loader and progress */
-.loader{animation:orion-fade-in .35s ease-out}
-.loader-head{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:600}
-.loader-head .loader-step{flex:1 1 auto;color:var(--ink)}
-.loader-head .loader-pct{color:var(--accent);font-size:11.5px}
-.loader-count{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap}
-.spinner{width:13px;height:13px;border-radius:50%;flex:none;border:2px solid var(--line);
-  border-top-color:var(--accent);animation:orion-spin .8s linear infinite}
-.htmx-indicator{opacity:0;transition:opacity .15s ease-in}
-.htmx-request .htmx-indicator,.htmx-request.htmx-indicator{opacity:1}
-#svc-busy{width:11px;height:11px;margin-right:5px;vertical-align:-1px}
-/* The provisioning log: fixed height so the card does not grow a line at a
-   time, and a thin bar because this is content the reader may want to look back
-   through. */
-.loader-log{margin-top:12px;height:8.5rem;overflow-y:auto;background:var(--bg);border:1px solid var(--line);
-  border-radius:var(--r);padding:8px 10px;font-family:var(--mono);font-size:11.5px;line-height:1.55;
-  color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;
-  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-.loader-log::-webkit-scrollbar{width:8px}
-.loader-log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-.steps{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:5px}
-.steps li{font-size:11.5px;color:var(--dim);display:flex;gap:8px;align-items:baseline}
-.steps li.done{color:var(--muted)}
-.steps li .tick{color:var(--ok);font-size:11px}
-.steps li.done .tick{color:var(--ok)}
-.steps li.current{color:var(--ink)}
-.steps li.current .tick{color:var(--accent);animation:orion-pulse 1.4s ease-in-out infinite}
-
-/* Smooth swap for HTMX-updated regions, and no jump while a bar animates. */
-.fade-swap.htmx-swapping{opacity:.35;transition:opacity .12s ease-out}
-.htmx-added{animation:orion-fade-in .25s ease-out}
-#instance-status{min-height:3.5rem}
-/* The status fragment is re-fetched every couple of seconds while a machine is
-   being built, the gauges every ten, the address list every minute. Without
-   this the arrival animation replays on every poll and the page looks as though
-   it were reloading itself. A new polling fragment inherits the problem, so add
-   its selector with the poll. */
-#instance-status .loader,
-#instance-status .htmx-added,
-#instance-status .htmx-added *,
-#instance-metrics .htmx-added,
-#instance-metrics .htmx-added *,
-#instance-addresses .htmx-added,
-#instance-addresses .htmx-added *{animation:none}
-/* View transitions: HTMX 2 drives these for full navigations and swaps. */
-@view-transition{navigation:auto}
-::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
-
-/* ------------------------------------------------------------- terminal */
-/* The pane's height is written by terminal.js, snapped to whole rows. Stated
-   here so the first paint has the right frame, and so the box does not jump
-   while the script measures. */
-.term-pane{height:460px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
-  padding:13px 15px;overflow:auto;position:relative}
-.term-screen{font-family:var(--mono);font-size:12px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap}
-.term-screen .caret{color:var(--accent)}
-/* The container adds nothing of its own. Stated rather than inherited, because
-   `.xterm` also carries xterm's own `.terminal` class — a rule of ours aimed at
-   that name silently resizes the terminal. */
-.term-pane .xterm{height:100%;width:100%;padding:0;border:0;max-height:none;background:transparent;
-  overflow:hidden;scrollbar-width:none;-ms-overflow-style:none}
-.term-pane .xterm-viewport{background:transparent !important}
-/* No scrollbar at all, on purpose: the wheel scrolls the buffer directly, and a
-   bar in a terminal pane is a strip of chrome that costs a column of text. Both
-   layers need it — xterm 5.5 makes `.xterm` itself scrollable, so a 17px native
-   bar appeared on the outer element while `.xterm-viewport` was already clean. */
-.term-pane .xterm::-webkit-scrollbar{width:0;height:0}
-.term-pane .xterm-viewport::-webkit-scrollbar{width:0;height:0}
-/* Shown only while the view is above the end of the output. */
-.term-jump{position:absolute;right:14px;bottom:12px;z-index:3;font:inherit;font-size:11px;line-height:1.4;
-  padding:4px 10px;cursor:pointer;color:var(--accent);background:rgba(11,12,16,.94);
-  border:1px solid var(--line);border-radius:999px}
-.term-jump:hover{border-color:var(--accent)}
-#terminal-status.ok{color:var(--ok)}
-#terminal-status.bad{color:var(--bad)}
-/* The provisioning log block. Its class used to be `.terminal` — exactly the
-   class xterm puts on its own root element, so the rule landed on the terminal
-   itself: a 420px max-height against a 435px screen, a padding and a border on
-   top of the pane's own, and a warm text colour from the retired palette.
-   Nothing here may reach xterm's elements. */
-.job-log{background:#05070d;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;
-  font-family:var(--mono);font-size:11.5px;line-height:1.6;max-height:420px;overflow:auto;
-  white-space:pre-wrap;word-break:break-word;color:var(--muted)}
-.job-log .err{color:var(--bad)}
-
-/* ---------------------------------------------------------- code and forms */
-.codebox{position:relative;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);
-  padding:12px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.6;
-  white-space:pre-wrap;word-break:break-word;color:var(--ink)}
-/* A copy button in the corner of its own box, rather than floated over it with
-   negative margins. Scoped to boxes that actually contain a button: the password
-   boxes do not, and would otherwise carry 80px of empty right padding. */
-.codebox:has(> .btn){padding-right:80px}
-.codebox > .btn{position:absolute;top:8px;right:8px}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.field label,.field > label{font-family:var(--mono);font-size:10px;text-transform:uppercase;
-  letter-spacing:.14em;color:var(--dim)}
-.field .hint,.hint{font-size:11px;color:var(--dim)}
-.input{width:100%;padding:8px 11px;border-radius:var(--r);background:var(--bg);border:1px solid var(--line);
-  color:var(--ink);font-family:inherit;font-size:13px}
-.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.input-sm{padding:4px 8px;font-size:11.5px}
-textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size:11.5px}
-/* `appearance: none` removes the native chevron, so the control has to carry
-   its own — a muted grey, like every other ornament on the panel. */
-select.input{appearance:none;padding-right:34px;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 11px center;background-size:11px}
-.checkline{display:flex;align-items:center;gap:9px;font-size:13px}
-.checkline input{width:16px;height:16px;accent-color:var(--accent)}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 18px}
-.tpl-pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
-.tpl{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--bg-alt);
-  cursor:pointer;display:block;position:relative}
-.tpl:hover{border-color:var(--accent)}
-.tpl input{position:absolute;opacity:0;pointer-events:none}
-.tpl.sel{border-color:var(--accent);background:var(--accent-soft)}
-.tpl .t{font-weight:600;font-size:12.5px;margin-bottom:4px}
-.tpl .d{font-size:11.5px;color:var(--muted)}
-
-/* --------------------------------------------------- disclosure and details */
-details summary{cursor:pointer;list-style:none;font-family:var(--mono);font-size:10.5px;
-  text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:flex;align-items:center;gap:7px}
-details summary::-webkit-details-marker{display:none}
-details summary::before{content:"\25B8";color:var(--accent);transition:transform .15s}
-details[open] summary::before{transform:rotate(90deg)}
-details summary:hover{color:var(--ink)}
-details.advanced{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
-.inline-edit > summary{text-transform:none;letter-spacing:.02em;font-size:11px;color:var(--accent)}
-.inline-edit > summary::before{content:"\2732";margin-right:5px}
-.inline-edit > summary:hover{color:var(--accent)}
-.inline-edit form{margin-top:9px}
-.advanced{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
-
-/* --------------------------------------------------- key/value and lists */
-.kv{display:grid;grid-template-columns:minmax(122px,auto) minmax(0,1fr);gap:9px 16px;font-size:13px}
-.kv dt{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--dim);padding-top:3px}
-.kv dd{min-width:0}
-.kv dd.mono{font-family:var(--mono);font-size:12.5px}
-.list{display:flex;flex-direction:column}
-.listrow{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;padding:11px 0;
-  border-bottom:1px solid var(--line-soft)}
-.listrow:last-child{border-bottom:0;padding-bottom:0}
-.timeline{display:flex;flex-direction:column}
-.timeline .item{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:16px;align-items:baseline;
-  padding:9px 0;border-bottom:1px solid var(--line-soft)}
-.timeline .item:last-child{border-bottom:0;padding-bottom:0}
-.timeline .when{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
-.timeline .what{color:var(--ink)}
-.timeline .what .target{color:var(--muted)}
-.timeline .who{font-family:var(--mono);font-size:11px;color:var(--dim)}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
-.tabs a{padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--muted);
-  border-bottom:2px solid transparent;text-decoration:none}
-.tabs a:hover{color:var(--ink);text-decoration:none}
-.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
-
-/* ------------------------------------------- une seule liste d'adresses */
-.addr-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;
-  padding-bottom:10px;border-bottom:1px solid var(--line)}
-.addr-list{display:flex;flex-direction:column}
-.addr-row{display:grid;grid-template-columns:178px minmax(0,1fr) auto;gap:16px;align-items:center;
-  padding:12px 0;border-bottom:1px solid var(--line-soft)}
-.addr-row:last-child{border-bottom:0;padding-bottom:0}
-.addr-state{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.addr-who{min-width:0}
-.addr-main{font-size:13px;font-weight:500;overflow-wrap:anywhere}
-.addr-main .addr-label{color:var(--accent);font-weight:600}
-.addr-main .addr-zone{color:var(--dim)}
-.addr-main:hover .addr-label{text-decoration:underline}
-.addr-main.pending{color:var(--dim)}
-.addr-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:3px}
-.addr-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.addr-caution{margin-top:4px;font-size:11px;color:var(--warn)}
-
-/* ------------------------------------------------------------- public site */
-/* The marketing pages keep their own rhythm and their own sections; what comes
-   from the prototype is the colour, the type register and the rule weight. */
 section{padding:64px 0}
 section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .hero h1{font-size:2.35rem;max-width:780px;margin-bottom:16px}
@@ -545,6 +510,10 @@ section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bot
 .lead{color:var(--muted)}
 .section-title{font-size:1.35rem;margin-bottom:8px}
 .section-lead{color:var(--muted);max-width:660px;margin-bottom:30px}
+/* La grille du prototype est à douze colonnes ; les pages publiques portent la
+   même classe avec leur propre découpage, d'où ces trois variantes et le
+   `cols-1` d'une pile. */
+.grid.cols-1{grid-template-columns:minmax(0,1fr)}
 .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
 .grid.cols-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
@@ -558,56 +527,70 @@ section.alt{background:var(--bg-alt);border-top:1px solid var(--line);border-bot
 .plan-card li::before{content:"—";color:var(--accent);margin-right:8px}
 .powered{font-size:11.5px;color:var(--dim)}
 
-/* ------------------------------------------------------------ responsive */
-@media (max-width:1180px){
-  .grid:has(> .tile) > .span3,
-  .grid:has(> .tile) > .span4,
-  .grid:has(> .tile) > .span5,
-  .grid:has(> .tile) > .span7,
-  .grid:has(> .tile) > .span8{grid-column:span 6}
-}
+/* ---------------------------------------------------------------- notices */
+/* Un message est une fenêtre en haut de page, pas un bloc dans le flux : il se
+   pose sous la barre, ne pousse rien, et se ferme. Une confirmation s'en va
+   seule au bout de quelques secondes ; un refus reste jusqu'à ce qu'on le
+   ferme. Les messages d'un formulaire, eux, restent à côté du champ qu'ils
+   concernent — c'est `.tile`/`.card`/`form` qu'ils habitent, et le sélecteur
+   ci-dessous ne les attrape pas. Sans script, les règles de marge plus haut
+   remettent les mêmes blocs proprement dans le flux. */
+#notices{position:fixed;left:0;right:0;top:76px;z-index:60;display:flex;flex-direction:column;
+  align-items:center;gap:8px;padding:0 24px;pointer-events:none}
+#notices .alert{pointer-events:auto;position:relative;width:100%;max-width:760px;
+  padding:11px 40px 11px 15px;box-shadow:0 14px 34px rgba(0,0,0,.5);
+  animation:orion-fade-up .28s ease-out both}
+#notices .alert.leaving{opacity:0;transform:translateY(-6px);
+  transition:opacity .16s ease,transform .16s ease}
+.notice-close{position:absolute;top:6px;right:6px;width:26px;height:26px;display:flex;
+  align-items:center;justify-content:center;background:none;border:0;cursor:pointer;
+  color:inherit;opacity:.7;font:inherit;font-size:15px;line-height:1;border-radius:var(--r)}
+.notice-close:hover{opacity:1;background:rgba(255,255,255,.06)}
+.notice-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:900px){#notices{top:74px;padding:0 14px}}
+@media (prefers-reduced-motion:reduce){#notices .alert{animation:none}}
+
+/* -------------------------------------------------- le tiroir, sous 900 px */
+/* Le prototype replie sa colonne en barre horizontale sous 900 px ; ce panneau
+   garde le tiroir que le propriétaire a demandé, et les règles du prototype
+   ci-dessus restent la référence pour tout le reste. */
 @media (max-width:900px){
-  :root{--pad:16px}
-  /* The sidebar becomes an off-canvas drawer: the title bar carries the menu
-     button, the drawer slides in over the page, the scrim closes it. */
   .shell{grid-template-columns:minmax(0,1fr)}
+  /* Le tiroir reprend la colonne telle qu'elle est sur grand écran : les règles
+     mobiles du prototype (barre horizontale, libellés de section masqués,
+     marque en bandeau) ne s'appliquent pas ici, c'est un panneau qui glisse. */
   .side{position:fixed;top:0;left:0;bottom:0;height:100vh;width:min(280px,84vw);z-index:80;
     transform:translateX(-100%);transition:transform .22s cubic-bezier(.22,.61,.36,1);
-    box-shadow:0 0 40px rgba(0,0,0,.5)}
+    box-shadow:0 0 40px rgba(0,0,0,.5);overflow-y:auto;flex-direction:column;flex-wrap:nowrap;
+    border-right:1px solid var(--line);border-bottom:0;padding:16px 12px}
   .side.open{transform:none}
+  .side .brand{padding:4px 10px 16px;border-bottom:1px solid var(--line-soft);
+    border-right:0;margin-right:0}
+  .side .brand .role{display:block}
+  .side .nav-label{display:block}
+  .side .nav{white-space:normal;border-left:2px solid transparent}
+  .side .foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft);
+    border-left:0;display:block}
+  .side .foot .who{display:block}
   .side-scrim{display:block}
   .topbar .nav-toggle{display:block}
-  .topbar{padding:0 var(--pad);height:64px}
+  .topbar{padding:0 24px;height:64px}
   .content-actions{display:flex;gap:8px;flex-wrap:wrap;padding:14px 0 0}
-  .grid:has(> .tile){padding:12px 0 0}
-  .band-head,.band-row{padding-left:var(--pad);padding-right:var(--pad)}
-  .gauges{grid-template-columns:minmax(0,1fr);gap:14px}
-  .addr-row{grid-template-columns:minmax(0,1fr);gap:10px}
-  .addr-actions{justify-content:flex-start}
-  .term-pane{height:320px}
-  table.table td.slug{display:none}
-  .timeline .item{grid-template-columns:minmax(0,1fr);gap:4px}
-  .timeline .who{display:none}
-  .card{padding:16px}
-  section{padding:48px 0}
-  .hero h1{font-size:1.9rem}
+  .content > .card,.content > .alert,.content > .empty,.content > .stack,
+  .content > .table-wrap,#flash > .alert{margin-left:14px;margin-right:14px}
+  .content-row{padding:12px 14px 0}
 }
 @media (max-width:720px){
   .pnav .nav-toggle{display:block}
   .pnav nav{position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;
     gap:0;background:var(--bg);border-bottom:1px solid var(--line);
-    max-height:0;overflow:hidden;opacity:0;visibility:hidden;padding:0 var(--pad);
+    max-height:0;overflow:hidden;opacity:0;visibility:hidden;padding:0 24px;
     transition:max-height .24s ease,opacity .18s ease,visibility .18s}
-  .pnav nav.open{max-height:78vh;opacity:1;visibility:visible;padding:8px var(--pad) 18px}
+  .pnav nav.open{max-height:78vh;opacity:1;visibility:visible;padding:8px 24px 18px}
   .pnav nav a:not(.btn){padding:14px 2px;font-size:14px;border-bottom:1px solid var(--line-soft)}
   .pnav nav a:not(.btn):last-child{border-bottom:0}
-  /* A comfortable target at the end of the panel, not a squashed one. */
   .pnav nav a.btn{margin-top:14px;width:100%;padding:12px 16px}
-  .grid:has(> .tile) > .tile{grid-column:span 12 !important}
-  .topbar h1{font-size:15px}
-  .topbar .breadcrumb{font-size:10px}
   .stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
-  .tile .v,.stat .v{font-size:22px}
 }
 @media (max-width:520px){
   .kv{grid-template-columns:minmax(0,1fr);gap:3px 0}

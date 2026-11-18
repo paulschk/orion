@@ -199,3 +199,60 @@ document.addEventListener('click', function (event) {
     btn.remove();
   }
 });
+
+// A notice is a window at the top of the page, not a block in the flow: it sits
+// under the bar, pushes nothing aside, and closes. A confirmation goes away on
+// its own; a refusal stays until someone closes it. Messages that belong to a
+// form stay with it - the selectors below only reach the page-level ones.
+(function () {
+  const region = document.createElement('div');
+  region.id = 'notices';
+  region.setAttribute('aria-live', 'polite');
+  document.body.appendChild(region);
+
+  const TRANSIENT = ['ok', 'info'];
+  const PAGE_LEVEL = '#flash > .alert, .content > .alert, .content > .content-row > .alert';
+
+  // The bar is sticky, not fixed, so the offset has to be measured rather than
+  // guessed - and re-measured, since the top bar changes height on a phone.
+  function place() {
+    const bar = document.querySelector('.topbar, .pnav');
+    region.style.top = ((bar ? bar.getBoundingClientRect().height : 0) + 10) + 'px';
+  }
+
+  function dismiss(alert) {
+    alert.classList.add('leaving');
+    setTimeout(function () { alert.remove(); }, 180);
+  }
+
+  function adopt(alert) {
+    if (!alert || alert.dataset.noticeReady) return;
+    alert.dataset.noticeReady = '1';
+    const tone = TRANSIENT.concat(['err', 'warn']).find(function (t) {
+      return alert.classList.contains(t);
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'notice-close';
+    close.setAttribute('aria-label', 'Fermer');
+    close.textContent = '\u00d7';
+    close.addEventListener('click', function () { dismiss(alert); });
+    alert.appendChild(close);
+    region.appendChild(alert);
+    if (TRANSIENT.indexOf(tone) !== -1) setTimeout(function () { dismiss(alert); }, 6000);
+  }
+
+  function lift(root) {
+    (root || document).querySelectorAll(PAGE_LEVEL).forEach(adopt);
+  }
+
+  lift();
+  place();
+  window.addEventListener('resize', place);
+  document.body.addEventListener('htmx:afterSwap', function (event) { lift(event.target); });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    const last = region.lastElementChild;
+    if (last) dismiss(last);
+  });
+})();
