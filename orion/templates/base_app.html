@@ -18,6 +18,10 @@
       <div class="role">{{ 'Administrateur' if user['role'] == 'admin' else 'Espace client' }}</div>
     </div>
 
+    {# Le corps de la colonne défile, pas la colonne entière : la marque garde sa
+       place en haut et le pied la sienne en bas, quel que soit le nombre de
+       liens. Le filet du haut et celui du bas ne bougent donc jamais. #}
+    <div class="nav-body">
     {% if user['role'] == 'admin' %}
       <div class="nav-label">Exploitation</div>
       <a class="nav {{ 'active' if path == '/admin' }}" href="/admin">Vue d'ensemble</a>
@@ -39,11 +43,14 @@
        that is the item that lights up on /app/instances/new. This link is the
        only remaining way in, so it stays. #}
     <a class="nav" href="/app/instances/new">Nouvelle instance</a>
-    <a class="nav {{ 'active' if path.startswith('/app/factures') }}" href="/app/factures">Factures</a>
-    <a class="nav {{ 'active' if path.startswith('/app/compte') }}" href="/app/compte">Compte</a>
+    </div>
 
     <div class="foot">
+      {# Factures et Compte sous l'adresse : ce sont les affaires du compte, pas
+         la navigation du service. #}
       <div class="who">{{ user['email'] }}</div>
+      <a class="nav {{ 'active' if path.startswith('/app/factures') }}" href="/app/factures">Factures</a>
+      <a class="nav {{ 'active' if path.startswith('/app/compte') }}" href="/app/compte">Compte</a>
       <a class="nav" href="/tarifs">Tarifs</a>
       <a class="nav" href="/logout">Déconnexion</a>
     </div>

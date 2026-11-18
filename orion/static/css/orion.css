@@ -275,12 +275,12 @@ details summary:hover{color:var(--ink)}
 
 /* ---------------------------------- le bandeau, à la demande du propriétaire */
 /* Le bandeau est une section, comme celles du site public : il ne prend aucune
-   respiration de la règle `section`. La sienne est celle de son en-tête, 13 px
-   en haut et 9 px en bas, appliquée à chaque rangée pour que le rythme soit
-   uniforme d'une rangée à l'autre. */
+   respiration de la règle `section`. Il n'a plus de padding en haut — la
+   demande du propriétaire — et garde 24 px sur les côtés et 9 px en bas, sur
+   l'en-tête comme sur chaque rangée. */
 .band{padding:0}
-.band-head,.band-row{padding:13px 24px 9px}
-.band-row + .band-row{padding-top:13px}
+.band-head,.band-row{padding:0 24px 9px}
+.band-row + .band-row{padding-top:0}
 
 /* -------------------------------------------------------- utilitaires en plus */
 .right{text-align:right}
@@ -297,6 +297,14 @@ details summary:hover{color:var(--ink)}
 
 /* ---------------------------------------------- la coquille du panneau */
 /* The prototype's `.side-foot` under the name this shell uses. */
+/* Le prototype fait défiler la colonne entière ; ici c'est son corps qui défile,
+   pour que la marque et le pied — et les deux filets qui les séparent — restent
+   à leur place quelle que soit la longueur du menu. */
+.side{overflow:hidden}
+.nav-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:2px;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.nav-body::-webkit-scrollbar{width:8px}
+.nav-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
 .side .foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft)}
 .side .foot .who{font-family:var(--mono);font-size:11px;color:var(--dim);padding:0 10px 8px;word-break:break-all}
 /* Le prototype pose `.logo` sur un bloc ; ici c'est un lien, donc sans cette
@@ -389,7 +397,9 @@ details summary:hover{color:var(--ink)}
 .steps li.current .tick{color:var(--accent);animation:orion-pulse 1.4s ease-in-out infinite}
 .fade-swap.htmx-swapping{opacity:.35;transition:opacity .12s ease-out}
 .htmx-added{animation:orion-fade-in .25s ease-out}
-#instance-status{min-height:3.5rem}
+/* Plus de hauteur minimale sur `#instance-status` : elle réservait la place du
+   chargement, mais elle laissait aussi les boutons d'alimentation centrés
+   contre une boîte plus haute que le badge de statut, sur la rangée d'état. */
 /* The status fragment is re-fetched every couple of seconds while a machine is
    being built, the gauges every ten, the address list every minute. Without
    this the arrival animation replays on every poll and the page looks as though
@@ -591,7 +601,7 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
      marque en bandeau) ne s'appliquent pas ici, c'est un panneau qui glisse. */
   .side{position:fixed;top:0;left:0;bottom:0;height:100vh;width:min(280px,84vw);z-index:80;
     transform:translateX(-100%);transition:transform .22s cubic-bezier(.22,.61,.36,1);
-    box-shadow:0 0 40px rgba(0,0,0,.5);overflow-y:auto;flex-direction:column;flex-wrap:nowrap;
+    box-shadow:0 0 40px rgba(0,0,0,.5);overflow:hidden;flex-direction:column;flex-wrap:nowrap;
     border-right:1px solid var(--line);border-bottom:0;padding:16px 12px}
   .side.open{transform:none}
   .side .brand{padding:4px 10px 16px;border-bottom:1px solid var(--line-soft);
