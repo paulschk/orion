@@ -42,6 +42,28 @@ def _slug_available(candidate: str) -> bool:
     return db.one("SELECT 1 FROM instances WHERE slug = ?", (candidate,)) is None
 
 
+def free_slug(preferred: str) -> str:
+    """The address must never count its neighbours.
+
+    A client may name an instance whatever they like, and that name is kept -
+    but the slug becomes the address their visitors see, and a counter in it
+    ("wordpress-2") publishes how many others exist and roughly when this one
+    was made. So when the chosen name is taken, a fresh random pair is drawn
+    instead of a suffix: the client keeps the name they typed, and can rename
+    the address from the panel whenever they want.
+    """
+    slug = slugify(preferred)
+    if _slug_available(slug):
+        return slug
+    for _ in range(20):
+        candidate = friendly_name()
+        if _slug_available(candidate):
+            return candidate
+    # 20 draws from ~1500 pairs all collided: something is wrong with the table,
+    # and a counted suffix is better than a 500.
+    return unique_slug(friendly_name())
+
+
 def unique_slug(base: str) -> str:
     slug = slugify(base)
     if _slug_available(slug):
@@ -287,8 +309,7 @@ async def instance_create(request: Request):
     # many other instances exist and roughly when this one was made. A readable
     # random pair gives nothing away; a client who wants their own name still
     # gets it, and it is what appears in the panel either way.
-    friendly = name or friendly_name()
-    slug = unique_slug(friendly)
+    slug = free_slug(name or friendly_name())
     # Each machine gets its own SSH account and its own identifier: a client is
     # never "orion" on every box, and support can refer to one machine by name.
     taken = {r["ssh_user"] for r in db.query("SELECT ssh_user FROM instances")}
