@@ -312,6 +312,20 @@
     // the remainder this is meant to remove.
     const wanted = needed + fixed + padBottom + 'px';
     if (pane.style.height !== wanted) pane.style.height = wanted;
+
+    // En plein écran, le navigateur impose sa hauteur au panneau : celle écrite
+    // juste au-dessus est ignorée, et seule la cellule mesurée décide du débord.
+    // Elle vient de ce que le moteur a produit, mais un changement de cadre peut
+    // le faire rendre à une autre échelle que celle mesurée avant. On regarde donc
+    // ce qui est vraiment rendu, et on retire jusqu'à deux rangées — une
+    // correction unique et bornée, jamais une boucle : un redimensionnement qui
+    // se relit est précisément ce qui repliait le panneau une ligne à la fois.
+    const after = screen.getBoundingClientRect();
+    const over = after.bottom - (pane.getBoundingClientRect().bottom - padBottom);
+    if (over > 1 && term.rows > 3) {
+      const drop = Math.min(2, Math.ceil(over / cellH));
+      if (drop > 0) term.resize(term.cols, Math.max(2, term.rows - drop));
+    }
   }
 
   term.onData(function (data) {
