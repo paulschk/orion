@@ -125,14 +125,18 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 // App shell: below the breakpoint the sidebar is an off-canvas drawer opened
 // from the burger in the top bar. It used to wrap into a cramped row of links.
 (function () {
-  var side = document.getElementById('side');
-  var scrim = document.getElementById('side-scrim');
-  if (!side) return;
+  // La coquille est remplacée à chaque navigation : on relit donc les éléments à
+  // chaque appel. Une référence gardée d'un chargement à l'autre pointerait sur
+  // un nœud détaché, et le tiroir ne s'ouvrirait plus jamais.
+  function el(id) { return document.getElementById(id); }
 
   function setOpen(open) {
+    var side = el('side');
+    var scrim = el('side-scrim');
+    if (!side) return;
     side.classList.toggle('open', open);
     if (scrim) scrim.classList.toggle('open', open);
-    var button = document.getElementById('side-toggle');
+    var button = el('side-toggle');
     if (button) {
       button.setAttribute('aria-expanded', open ? 'true' : 'false');
       button.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
@@ -143,18 +147,19 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 
   // Le bouton habite la barre de titre, que htmx remplace à chaque navigation :
   // un écouteur posé sur lui disparaîtrait au premier clic. On écoute donc au
-  // niveau du document, où l'on survit aux remplacements. Le reste (le voile, le
-  // clic sur un lien, Échap, le passage en grand écran) vit hors de la coquille
-  // et garde ses écouteurs directs.
+  // niveau du document, où l'on survit aux remplacements. Le voile, le clic sur
+  // un lien et Échap n'ont pas besoin de ça : le voile vit hors de la coquille,
+  // et les deux autres se rattachent par délégation.
   document.addEventListener('click', function (event) {
-    var button = event.target.closest && event.target.closest('#side-toggle');
-    if (!button) return;
-    event.stopPropagation();
-    setOpen(!side.classList.contains('open'));
-  });
-  if (scrim) scrim.addEventListener('click', close);
-  side.addEventListener('click', function (e) {
-    if (e.target.closest('a')) close();
+    if (!event.target.closest) return;
+    if (event.target.closest('#side-toggle')) {
+      event.stopPropagation();
+      setOpen(!(el('side') || {}).classList.contains('open'));
+      return;
+    }
+    var scrim = event.target.closest('#side-scrim');
+    if (scrim) { close(); return; }
+    if (event.target.closest('#side a')) { close(); }
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') close();
@@ -167,16 +172,23 @@ document.body.addEventListener('htmx:afterSwap', function (event) {
 
 // La coquille est remplacée à chaque navigation, et le remplacement renvoie le
 // corps de la colonne en haut : le menu sautait donc à chaque clic. On note sa
-// position avant, on la remet après.
+// position avant, on la remet après — dans l'événement de stabilisation, pas
+// dans celui du remplacement : un élément tout juste inséré n'a pas encore sa
+// hauteur défilante, et la valeur y serait ramenée à zéro.
 (function () {
   var remembered = 0;
   document.body.addEventListener('htmx:beforeSwap', function () {
     var body = document.querySelector('.side .nav-body');
     remembered = body ? body.scrollTop : 0;
   });
-  document.body.addEventListener('htmx:afterSwap', function () {
-    var body = document.querySelector('.side .nav-body');
-    if (body && remembered) body.scrollTop = remembered;
+  ['htmx:afterSettle', 'htmx:afterSwap'].forEach(function (name) {
+    document.body.addEventListener(name, function () {
+      if (!remembered) return;
+      requestAnimationFrame(function () {
+        var body = document.querySelector('.side .nav-body');
+        if (body) body.scrollTop = remembered;
+      });
+    });
   });
 })();
 

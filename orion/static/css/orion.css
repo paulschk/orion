@@ -643,8 +643,10 @@ textarea.input{min-height:90px;resize:vertical;font-family:var(--mono);font-size
 /* La gouttière est réservée en permanence : sans elle, une page courte n'a pas
    de barre de défilement et une page longue en a une, donc toute la mise en page
    se décale de 15 px à chaque changement de page. C'est exactement le saut qu'on
-   vient de corriger côté navigation, vu depuis la mise en page. */
-html{scrollbar-gutter:stable}
+   vient de corriger côté navigation, vu depuis la mise en page. Les deux lignes
+   sont là pour la même raison : la première marche partout, la seconde dit
+   l'intention aux navigateurs qui la comprennent. */
+html{overflow-y:scroll;scrollbar-gutter:stable}
 
 /* -------------------------------------------------- le tiroir, sous 900 px */
 /* Le prototype replie sa colonne en barre horizontale sous 900 px ; ce panneau
