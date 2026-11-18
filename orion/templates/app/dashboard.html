@@ -2,137 +2,168 @@
 {% block title %}Tableau de bord{% endblock %}
 {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting · espace client</span>{% endblock %}
 {% block heading %}Tableau de bord{% endblock %}
-{% block actions %}{% endblock %}
+
+{% block actions %}
+  <a class="btn btn-sm" href="/app/instances/new">Créer une instance</a>
+{% endblock %}
 
 {% block content %}
 
-{# Everything below is relative to what this client rents. The host's own
+{# Every figure below is relative to what this client rents. The host's own
    capacity is the operator's business and used to be shown here by mistake. #}
-<div class="stat-grid">
-  <div class="stat accent">
-    <div class="k">Mes instances</div>
-    <div class="v">{{ rows|length }}</div>
-    <div class="tiny dim">
-      {% if usage.running %}{{ usage.running }} en ligne{% else %}aucune en ligne{% endif %}
+{% set renew = (rows|selectattr('expires_at')|map(attribute='expires_at')|list|sort|first) %}
+
+<section class="band">
+  <div class="band-head">
+    <h2>Ce que vous louez</h2>
+    <span class="sub">{{ rows|length }} instance{{ 's' if rows|length > 1 }} · {{ usage.running }} en ligne</span>
+    <span class="legend">
+      <span><i class="m-full"></i>En ligne</span>
+      <span><i class="m-ring"></i>au repos</span>
+      <span><i class="m-warn"></i>à surveiller</span>
+      <span><i class="m-fail"></i>en erreur</span>
+    </span>
+  </div>
+
+  <div class="band-row">
+    {% for name in rows|map(attribute='plan_name')|select|unique|list %}
+    <span class="badge idle">{{ name }}</span>
+    {% endfor %}
+    <span class="badge">{{ domain }}</span>
+    <span class="tiny dim mono push">Prochain renouvellement : {{ renew[:10] if renew else '—' }}</span>
+  </div>
+
+  <div class="band-row">
+    <div class="gauges">
+      <div class="gauge {{ 'attn' if usage.ram_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Mémoire</span><span class="val">{{ usage.ram_used_mb|human_mb }} / {{ usage.ram_rented_mb|human_mb }}</span></div>
+        <div class="bar {{ 'bad' if usage.ram_pct > 90 else ('warn' if usage.ram_pct > 70 else 'ok') }}"><span style="width:{{ [usage.ram_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ usage.ram_free_mb|human_mb }} libres sur ce que vous louez</div>
+      </div>
+      <div class="gauge {{ 'attn' if usage.disk_pct >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Disque</span><span class="val">{{ usage.disk_used_gb }} / {{ usage.disk_rented_gb }} Go</span></div>
+        <div class="bar {{ 'bad' if usage.disk_pct > 90 else ('warn' if usage.disk_pct > 70 else 'ok') }}"><span style="width:{{ [usage.disk_pct, 100]|min }}%"></span></div>
+        <div class="note">{{ usage.disk_free_gb }} Go libres sur ce que vous louez</div>
+      </div>
+      {# A reading needs two samples of the daemon's cumulative counter, so the
+         first view of a fresh process has no figure yet. Say that rather than
+         drawing a machine at rest. #}
+      {% set cpu = usage.cpu_pct %}
+      <div class="gauge {{ 'attn' if cpu is not none and cpu >= 70 }}">
+        <div class="gauge-h"><span class="lbl">Processeur</span><span class="val">{% if cpu is not none %}{{ cpu }} %{% else %}—{% endif %}</span></div>
+        <div class="bar {{ 'bad' if cpu is not none and cpu > 90 else ('warn' if cpu is not none and cpu > 70 else ('ok' if cpu is not none else '')) }}"><span style="width:{{ cpu if cpu is not none else 0 }}%"></span></div>
+        <div class="note">
+          {% if cpu is not none %}Moyenne de vos {{ usage.running }} instance{{ 's' if usage.running > 1 }} en ligne
+          {% else %}Calcul en cours — la mesure se fait entre deux lectures.{% endif %}
+        </div>
+      </div>
     </div>
   </div>
-  <div class="stat">
-    <div class="k">RAM louée</div>
-    <div class="v">{{ usage.ram_rented_mb|human_mb }}</div>
-    <div class="tiny dim">{{ usage.ram_used_mb|human_mb }} utilisés · {{ usage.ram_free_mb|human_mb }} libres</div>
-    <div class="bar {{ 'warn' if usage.ram_pct > 85 }}"><span style="width:{{ usage.ram_pct }}%"></span></div>
-  </div>
-  <div class="stat">
-    <div class="k">Disque loué</div>
-    <div class="v">{{ usage.disk_rented_gb }}<small> GB</small></div>
-    <div class="tiny dim">{{ usage.disk_used_gb }} GB utilisés · {{ usage.disk_free_gb }} GB libres</div>
-    <div class="bar {{ 'warn' if usage.disk_pct > 85 }}"><span style="width:{{ usage.disk_pct }}%"></span></div>
-  </div>
-  <div class="stat">
-    <div class="k">vCPU loués</div>
-    <div class="v">{{ usage.vcpu }}</div>
-    <div class="tiny dim">sur {{ rows|length }} instance{{ 's' if rows|length > 1 }}</div>
-  </div>
-</div>
+</section>
 
 {% if running_jobs %}
-<div class="alert info">{{ running_jobs }} tâche(s) en cours d'exécution sur l'hôte.</div>
+<div class="content-row"><div class="alert info">{{ running_jobs }} tâche(s) en cours d'exécution sur l'hôte.</div></div>
 {% endif %}
 
-<div class="card">
-  <div class="card-h">
-    <h2>Mes instances</h2>
-    <a class="small" href="/app/instances">Tout voir</a>
-  </div>
-  {% if rows %}
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nom</th><th>Offre</th><th>Modèle</th><th>État</th>
-          <th>RAM</th><th>Disque</th><th>Adresse</th><th class="num">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in rows %}
-        {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
-        <tr>
-          <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
-              <div class="tiny dim mono">{{ i['slug'] }}.{{ domain }}</div></td>
-          <td class="small">{{ i['plan_name'] or '—' }}</td>
-          <td class="small"><span class="pill">{{ i['template'] }}</span></td>
-          <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
-          <td class="small mono">
-            {% if i['ram_used_mb'] is not none %}
-              {{ i['ram_used_mb']|human_mb }}<div class="tiny dim">{{ i['ram_free_mb']|human_mb }} libre</div>
-            {% else %}—{% endif %}
-          </td>
-          <td class="small mono">
-            {% if i['disk_used_gb'] is not none %}
-              {{ i['disk_used_gb'] }} GB<div class="tiny dim">{{ i['disk_free_gb'] }} GB libres</div>
-            {% else %}—{% endif %}
-          </td>
-          <td class="small mono">{{ i['container_ip'] or '—' }}</td>
-          <td class="num"><a class="btn btn-sm" href="/app/instances/{{ i['id'] }}">Gérer</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty">
-    <h3>Aucune instance</h3>
-    <p class="small">Provisionnez votre premier serveur : il sera en ligne en moins d'une minute.</p>
-    <a class="btn btn-primary mt2" href="/app/instances/new">Créer une instance</a>
-  </div>
-  {% endif %}
-</div>
+<div class="grid">
 
-<div class="grid cols-2">
-  <div class="card">
-    <div class="card-h">
-      <h2>Modèles disponibles</h2>
-      <a class="small" href="/app/instances/new">En créer une</a>
+  <div class="tile span3">
+    <div class="k">Mes instances</div><div class="v">{{ rows|length }}</div>
+    <div class="s">{% if usage.running %}{{ usage.running }} en ligne{% else %}aucune en ligne{% endif %}</div>
+  </div>
+  <div class="tile span3">
+    <div class="k">RAM louée</div><div class="v">{{ usage.ram_rented_mb|human_mb }}</div>
+    <div class="s">{{ usage.ram_used_mb|human_mb }} utilisés · {{ usage.ram_free_mb|human_mb }} libres</div>
+  </div>
+  <div class="tile span3">
+    <div class="k">Disque loué</div><div class="v">{{ usage.disk_rented_gb }}<small> Go</small></div>
+    <div class="s">{{ usage.disk_used_gb }} Go utilisés · {{ usage.disk_free_gb }} Go libres</div>
+  </div>
+  <div class="tile span3">
+    <div class="k">vCPU loués</div><div class="v">{{ usage.vcpu }}</div>
+    <div class="s">sur {{ rows|length }} instance{{ 's' if rows|length > 1 }}</div>
+  </div>
+
+  <section class="tile span7">
+    <div class="tile-h">
+      <h2>Mes instances</h2>
+      <a class="btn btn-sm btn-ghost" href="/app/instances">Tout voir</a>
     </div>
-    <div class="stack">
+    {% if rows %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Nom</th><th>Offre</th><th>État</th><th class="num">RAM</th><th class="num">Disque</th><th class="num">Action</th></tr>
+        </thead>
+        <tbody>
+          {% for i in rows %}
+          {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
+          <tr>
+            <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
+                <div class="tiny dim mono">{{ i['slug'] }}.{{ domain }}</div></td>
+            <td class="small">{{ i['plan_name'] or '—' }} <span class="slug">{{ i['template'] }}</span></td>
+            <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
+            <td class="num">
+              {% if i['ram_used_mb'] is not none %}{{ i['ram_used_mb']|human_mb }}
+              <div class="tiny dim">{{ i['ram_free_mb']|human_mb }} libre</div>{% else %}—{% endif %}
+            </td>
+            <td class="num">
+              {% if i['disk_used_gb'] is not none %}{{ i['disk_used_gb'] }} Go
+              <div class="tiny dim">{{ i['disk_free_gb'] }} Go libres</div>{% else %}—{% endif %}
+            </td>
+            <td class="num"><a class="btn btn-sm" href="/app/instances/{{ i['id'] }}">Gérer</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <h3>Aucune instance</h3>
+      <p class="small">Provisionnez votre premier serveur : il sera en ligne en moins d'une minute.</p>
+      <a class="btn btn-primary mt2" href="/app/instances/new">Créer une instance</a>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="tile span5">
+    <div class="tile-h">
+      <h2>Modèles disponibles</h2>
+      <a class="btn btn-sm btn-ghost" href="/app/instances/new">En créer une</a>
+    </div>
+    <dl class="kv">
       {% for tpl in templates %}
-      <div class="spread" style="padding:7px 0;border-bottom:1px solid var(--border-soft)">
-        <div>
-          <div style="font-weight:600;font-size:.9rem">{{ tpl.label }}</div>
-          <div class="tiny dim">{{ tpl.tagline }}</div>
-        </div>
-        {% if tpl.web %}<span class="badge idle">site web</span>{% endif %}
+      <dt>{{ tpl.label }}</dt>
+      <dd>{{ tpl.tagline }}{% if tpl.web %} <span class="badge idle">site web</span>{% endif %}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section class="tile span12">
+    <div class="tile-h">
+      <h2>Dernières factures</h2>
+      <a class="btn btn-sm btn-ghost" href="/app/factures">Toutes</a>
+    </div>
+    {% if invoices %}
+    <div class="timeline">
+      {% for inv in invoices %}
+      <div class="item">
+        <span class="when">{{ inv['issued_at'][:10] }}</span>
+        <span class="grow">
+          <span class="what mono">{{ inv['number'] }}</span>
+          <span class="dim">· {{ inv['plan_name'] or inv['description'][:28] }}</span>
+          {% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
+          {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
+          {% else %}<span class="badge warn">à régler</span>{% endif %}
+        </span>
+        <span class="who">{{ inv['amount_cents']|money }}</span>
       </div>
       {% endfor %}
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">
-      <h2>Dernières factures</h2>
-      <a class="small" href="/app/factures">Toutes</a>
-    </div>
-    {% if invoices %}
-      <div class="stack">
-        {% for inv in invoices %}
-        <div class="spread" style="padding:7px 0;border-bottom:1px solid var(--border-soft)">
-          <div>
-            <div class="mono" style="font-size:.85rem">{{ inv['number'] }}</div>
-            <div class="tiny dim">{{ inv['issued_at'][:10] }} · {{ inv['plan_name'] or inv['description'][:28] }}</div>
-          </div>
-          <div class="row tight">
-            <span class="small">{{ inv['amount_cents']|money }}</span>
-            {% if inv['status'] == 'paid' %}<span class="badge ok">payée</span>
-            {% elif inv['status'] == 'void' %}<span class="badge muted">annulée</span>
-            {% else %}<span class="badge warn">à régler</span>{% endif %}
-          </div>
-        </div>
-        {% endfor %}
-      </div>
     {% else %}
-      <p class="small dim">Aucune facture pour l'instant.</p>
+    <p class="small dim">Aucune facture pour l'instant.</p>
     {% endif %}
-  </div>
-</div>
+  </section>
 
+</div>
 {% endblock %}

@@ -167,9 +167,15 @@ def _client_usage(instances):
     Every figure is relative to the quotas of the plans they pay for. The host's
     own headroom is deliberately not part of this: it is the operator's business
     and it confused the client's view of their own machine.
+
+    CPU comes from `metrics.sample`, which needs two readings of the daemon's
+    cumulative counter — so on the very first page view of a process it is
+    `None`, not zero. A missing reading and a machine at rest are different
+    facts, and the dashboard says which one it is showing.
     """
     totals = {"vcpu": 0, "ram_rented_mb": 0, "ram_used_mb": 0,
-              "disk_rented_gb": 0.0, "disk_used_gb": 0.0, "running": 0}
+              "disk_rented_gb": 0.0, "disk_used_gb": 0.0, "running": 0,
+              "cpu_pct": None, "_cpu_sum": 0.0, "_cpu_samples": 0}
     live = {}
     for row in instances:
         totals["vcpu"] += row["vcpu"] or 0
@@ -180,7 +186,10 @@ def _client_usage(instances):
         else:
             continue
         try:
-            sample = incus.usage(row["incus_name"])
+            sample = metrics.sample(row["incus_name"],
+                                    memory_mb=row["memory_mb"] or 0,
+                                    vcpu=row["vcpu"] or 1,
+                                    state=incus.state(row["incus_name"]))
         except IncusError:
             sample = {}
         if not sample:
@@ -188,6 +197,9 @@ def _client_usage(instances):
         live[row["id"]] = sample
         totals["ram_used_mb"] += round(sample["memory_used"] / MIB)
         totals["disk_used_gb"] += sample["disk_used"] / GIB
+        if sample.get("cpu_pct") is not None:
+            totals["_cpu_sum"] += sample["cpu_pct"]
+            totals["_cpu_samples"] += 1
 
     totals["disk_used_gb"] = round(totals["disk_used_gb"], 1)
     totals["ram_free_mb"] = max(0, totals["ram_rented_mb"] - totals["ram_used_mb"])
@@ -196,6 +208,9 @@ def _client_usage(instances):
                          if totals["ram_rented_mb"] else 0)
     totals["disk_pct"] = (min(100, round(100 * totals["disk_used_gb"] / totals["disk_rented_gb"]))
                           if totals["disk_rented_gb"] else 0)
+    if totals["_cpu_samples"]:
+        totals["cpu_pct"] = round(totals["_cpu_sum"] / totals["_cpu_samples"])
+    del totals["_cpu_sum"], totals["_cpu_samples"]
     return totals, live
 
 
