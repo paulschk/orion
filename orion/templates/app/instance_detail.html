@@ -49,7 +49,18 @@
       {% include "partials/instance_status.html" %}
     </div>
 
-    <span class="row tight push">
+    {# Le site que l'instance expose, juste à droite de son état : c'est ce que le
+       client ouvre, et le seul geste qu'il vient chercher ici. #}
+    {% if default_site %}
+    <a class="tiny mono" href="https://{{ default_site['domain'] }}" target="_blank"
+       rel="noopener">{{ default_site['domain'] }}</a>
+    {% endif %}
+
+    {# Les boutons d'alimentation s'effacent tant que l'instance se construit — une
+       action n'a pas de sens sur une machine qui n'existe pas encore. La règle qui
+       les cache est dans la feuille, accrochée à l'état que porte le fragment sondé :
+       aucun script, et l'effacement suit le sondage. #}
+    <span class="row tight push power">
       <form method="post" action="/app/instances/{{ instance['id'] }}/power" class="inline-form">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="start">
         <button class="btn btn-sm" {{ 'disabled' if instance['status'] == 'running' }}>Démarrer</button>

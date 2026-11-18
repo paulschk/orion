@@ -213,13 +213,8 @@ document.addEventListener('click', function (event) {
   const TRANSIENT = ['ok', 'info'];
   const PAGE_LEVEL = '#flash > .alert, .content > .alert, .content > .content-row > .alert';
 
-  // The bar is sticky, not fixed, so the offset has to be measured rather than
-  // guessed - and re-measured, since the top bar changes height on a phone.
-  function place() {
-    const bar = document.querySelector('.topbar, .pnav');
-    region.style.top = ((bar ? bar.getBoundingClientRect().height : 0) + 10) + 'px';
-  }
-
+  // The window sits on the bar, in the top right corner: a fixed offset in the
+  // sheet, not a measured one, since the bar is sticky and its height changes.
   function dismiss(alert) {
     alert.classList.add('leaving');
     setTimeout(function () { alert.remove(); }, 180);
@@ -247,8 +242,6 @@ document.addEventListener('click', function (event) {
   }
 
   lift();
-  place();
-  window.addEventListener('resize', place);
   document.body.addEventListener('htmx:afterSwap', function (event) { lift(event.target); });
   document.addEventListener('keydown', function (event) {
     if (event.key !== 'Escape') return;

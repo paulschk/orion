@@ -33,34 +33,9 @@
     <span class="tiny dim mono push">Prochain renouvellement : {{ renew[:10] if renew else '—' }}</span>
   </div>
 
-  <div class="band-row">
-    <div class="gauges">
-      {# Processeur, mémoire, stockage : le même ordre que le bandeau d'une
-         instance, pour que les trois grandeurs se lisent au même endroit d'une
-         page à l'autre. A reading needs two samples of the daemon's cumulative
-         counter, so the first view of a fresh process has no CPU figure yet:
-         say that rather than drawing a machine at rest. #}
-      {% set cpu = usage.cpu_pct %}
-      <div class="gauge {{ 'attn' if cpu is not none and cpu >= 70 }}">
-        <div class="gauge-h"><span class="lbl">Processeur</span><span class="val">{% if cpu is not none %}{{ cpu }} %{% else %}—{% endif %}</span></div>
-        <div class="bar {{ 'bad' if cpu is not none and cpu > 90 else ('warn' if cpu is not none and cpu > 70 else ('ok' if cpu is not none else '')) }}"><span style="width:{{ cpu if cpu is not none else 0 }}%"></span></div>
-        <div class="note">
-          {% if cpu is not none %}Moyenne de vos {{ usage.running }} instance{{ 's' if usage.running > 1 }} en ligne
-          {% else %}Calcul en cours — la mesure se fait entre deux lectures.{% endif %}
-        </div>
-      </div>
-      <div class="gauge {{ 'attn' if usage.ram_pct >= 70 }}">
-        <div class="gauge-h"><span class="lbl">Mémoire</span><span class="val">{{ usage.ram_used_mb|human_mb }} / {{ usage.ram_rented_mb|human_mb }}</span></div>
-        <div class="bar {{ 'bad' if usage.ram_pct > 90 else ('warn' if usage.ram_pct > 70 else 'ok') }}"><span style="width:{{ [usage.ram_pct, 100]|min }}%"></span></div>
-        <div class="note">{{ usage.ram_free_mb|human_mb }} libres sur ce que vous louez</div>
-      </div>
-      <div class="gauge {{ 'attn' if usage.disk_pct >= 70 }}">
-        <div class="gauge-h"><span class="lbl">Stockage</span><span class="val">{{ usage.disk_used_gb }} / {{ usage.disk_rented_gb }} Go</span></div>
-        <div class="bar {{ 'bad' if usage.disk_pct > 90 else ('warn' if usage.disk_pct > 70 else 'ok') }}"><span style="width:{{ [usage.disk_pct, 100]|min }}%"></span></div>
-        <div class="note">{{ usage.disk_free_gb }} Go libres sur ce que vous louez</div>
-      </div>
-    </div>
-  </div>
+  {# Plus de barres d'utilisation : la mémoire et le stockage se lisent dans les
+     tuiles et dans le tableau, en utilisée / totale. Une barre de processeur
+     n'avait de toute façon pas de « loué » auquel se rapporter. #}
 </section>
 
 {% if running_jobs %}
@@ -103,15 +78,16 @@
           <tr>
             <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
                 <div class="tiny dim mono">{{ i['slug'] }}.{{ domain }}</div></td>
-            <td class="small">{{ i['plan_name'] or '—' }} <span class="slug">{{ i['template'] }}</span></td>
+            <td><span class="cell-row"><span class="small">{{ i['plan_name'] or '—' }}</span>
+                <span class="slug">{{ i['template'] }}</span></span></td>
             <td><span class="badge {{ lbl[1] }}"><span class="dot"></span>{{ lbl[0] }}</span></td>
             <td class="num">
-              {% if i['ram_used_mb'] is not none %}{{ i['ram_used_mb']|human_mb }}
-              <div class="tiny dim">{{ i['ram_free_mb']|human_mb }} libre</div>{% else %}—{% endif %}
+              {% if i['ram_used_mb'] is not none and i['memory_mb'] %}{{ i['ram_used_mb']|human_mb }} / {{ i['memory_mb']|human_mb }}
+              {% else %}—{% endif %}
             </td>
             <td class="num">
-              {% if i['disk_used_gb'] is not none %}{{ i['disk_used_gb'] }} Go
-              <div class="tiny dim">{{ i['disk_free_gb'] }} Go libres</div>{% else %}—{% endif %}
+              {% if i['disk_used_gb'] is not none and i['disk_gb'] %}{{ i['disk_used_gb'] }} / {{ i['disk_gb'] }} Go
+              {% else %}—{% endif %}
             </td>
             <td class="num"><a class="btn btn-sm" href="/app/instances/{{ i['id'] }}">Gérer</a></td>
           </tr>
@@ -130,15 +106,27 @@
 
   <section class="tile span5">
     <div class="tile-h">
-      <h2>Modèles disponibles</h2>
-      <a class="btn btn-sm btn-ghost" href="/app/instances/new">En créer une</a>
+      <h2>Vos adresses</h2>
+      <span class="sub">{{ published|length }} publiée{{ 's' if published|length > 1 }}</span>
     </div>
-    <dl class="kv">
-      {% for tpl in templates %}
-      <dt>{{ tpl.label }}</dt>
-      <dd>{{ tpl.tagline }}{% if tpl.web %} <span class="badge idle">site web</span>{% endif %}</dd>
+    {% if published %}
+    <div class="list">
+      {% for site in published %}
+      <div class="listrow">
+        <div>
+          <a class="addr-main mono" href="https://{{ site['domain'] }}" target="_blank" rel="noopener">{{ site['domain'] }}</a>
+          <div class="tiny dim">{{ site['instance_name'] }} · port {{ site['upstream'] }}</div>
+        </div>
+        <button class="btn btn-sm btn-ghost" type="button" data-copy="https://{{ site['domain'] }}">Copier</button>
+      </div>
       {% endfor %}
-    </dl>
+    </div>
+    {% else %}
+    <p class="small dim">
+      Aucune adresse publiée. Chaque instance en reçoit une à sa création ; les autres se
+      publient depuis sa page, ou se déclarent en domaine à vous.
+    </p>
+    {% endif %}
   </section>
 
   <section class="tile span12">
