@@ -96,6 +96,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     location = (exc.headers or {}).get("Location")
     if location and 300 <= exc.status_code < 400:
         return RedirectResponse(location, status_code=exc.status_code)
+    # Un en-tête posé par l'exception doit survivre au rendu : `HX-Redirect` est
+    # ce qui demande à htmx une navigation réelle au lieu de remplacer sa cible
+    # par la page reçue. Pour ce cas le corps ne compte pas.
+    if (exc.headers or {}).get("HX-Redirect"):
+        return JSONResponse({}, status_code=exc.status_code, headers=exc.headers)
     if request.url.path.startswith("/api/"):
         return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
     from .templating import render
