@@ -113,7 +113,13 @@
          terminal. Le module du terminal branche le bouton et redimensionne le
          panneau à la fenêtre — l'API plein écran fait le reste, Échap compris. #}
       <button class="btn btn-sm btn-ghost" type="button" id="term-fs">Plein écran</button>
-      <span class="sub" id="terminal-status"></span>
+      {# L'état dit si la session tient ; le transport dit par où elle passe, et
+         que c'est chiffré dans les deux cas. Un seul élément flexible pour les
+         deux, afin de ne pas redistribuer l'en-tête de la tuile. #}
+      <span id="terminal-state" style="display:inline-flex;align-items:baseline;gap:9px">
+        <span class="sub" id="terminal-status"></span>
+        <span class="sub dim" id="terminal-transport"></span>
+      </span>
     </div>
     <div id="terminal" class="term-pane"
          data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"

@@ -41,6 +41,18 @@
   }
 
   const statusEl = document.getElementById('terminal-status');
+  const transportEl = document.getElementById('terminal-transport');
+  // Le transport est dit à côté de l'état, et non fondu dedans : « connecté »
+  // répond à « est-ce que ça marche », le transport à « par où ça passe, et est-ce
+  // chiffré ». Les deux passent par TLS — le repli emprunte des requêtes HTTPS,
+  // jamais du clair — et l'étiquette précédente, « HTTP », laissait croire
+  // exactement le contraire. C'était un mauvais nom, pas une mauvaise pratique.
+  const setTransport = (text, detail) => {
+    if (!transportEl) return;
+    transportEl.textContent = text || '';
+    if (detail) transportEl.title = detail;
+    else transportEl.removeAttribute('title');
+  };
   const setStatus = (text, tone) => {
     if (!statusEl) return;
     statusEl.textContent = text;
@@ -115,12 +127,13 @@
   let stopped = false;
   const encoder = new TextEncoder();
 
-  // ---- Le repli HTTP ------------------------------------------------------
-  // Mesuré derrière Cloudflare : la poignée de main WebSocket d'un navigateur
-  // n'atteint jamais l'origine, alors que la même, écrite à la main en HTTP/1.1,
-  // est acceptée. Plutôt que d'en dépendre, le terminal bascule sur deux requêtes
-  // ordinaires — sortie en flux d'événements, entrée en POST — dès que la
-  // première n'aboutit pas, et le dit dans la barre d'état.
+  // ---- Le repli HTTPS -----------------------------------------------------
+  // Le WebSocket est le meilleur transport, et c'est celui qu'on garde dès qu'il
+  // s'ouvre. Quand la poignée de main n'aboutit pas — un intermédiaire qui ne la
+  // relaie pas, une réponse qui ne vient jamais — le terminal bascule sur deux
+  // requêtes ordinaires, chiffrées par le même TLS que la page : la sortie en flux
+  // d'événements, l'entrée en POST. Aucune donnée ne circule en clair, ni ici ni
+  // là ; seule la forme de la conversation change.
   const HANG_MS = 4000;          // au-delà, la poignée de main n'aboutira pas
   const INPUT_FLUSH_MS = 40;     // les frappes partent groupées, pas une par une
   const streamUrl = pane.dataset.stream || '';
@@ -172,14 +185,17 @@
     stopKeepalive();
     if (ws) { try { ws.close(); } catch (e) { /* déjà fermé */ } ws = null; }
 
-    setStatus('repli HTTP…', 'warn');
+    setStatus('repli…', 'warn');
     term.writeln('\r\n\x1b[90m[le WebSocket n\'a pas abouti' + (reason ? ' — ' + reason : '') +
-                 ' : bascule sur le transport HTTP]\x1b[0m');
+                 ' : bascule sur des requêtes HTTPS, chiffrées comme la page]\x1b[0m');
 
     fallback = new EventSource(streamUrl);
     fallback.addEventListener('ready', function (event) {
       try { streamToken = JSON.parse(event.data).token || ''; } catch (e) { streamToken = ''; }
-      setStatus('connecté (HTTP)', 'ok');
+      setStatus('connecté', 'ok');
+      setTransport('HTTPS (chiffré, repli)',
+        "Le WebSocket n'a pas abouti : la session passe par des requêtes HTTPS, chiffrées par le "
+        + "même TLS que cette page — la sortie en flux d'événements, l'entrée en requêtes.");
       term.focus();
       sendResize();
     });
@@ -193,7 +209,8 @@
       stopped = true;
       try { dead.close(); } catch (e) { /* rien */ }
       setStatus('flux interrompu — rechargez la page', 'dim');
-      term.writeln('\r\n\x1b[31m[le flux HTTP s\'est interrompu]\x1b[0m');
+      setTransport('');
+      term.writeln('\r\n\x1b[31m[le flux HTTPS s\'est interrompu]\x1b[0m');
     };
   }
 
@@ -214,6 +231,7 @@
   function connect() {
     if (stopped || mode === 'fallback') return;
     setStatus(attempt ? 'reconnexion…' : 'connexion…');
+    setTransport('');
 
     // Une poignée de main ne prend pas toujours la peine d'échouer proprement :
     // certains environnements font lever le constructeur. Sans ce garde-fou,
@@ -243,6 +261,8 @@
       const wasRetry = attempt > 0;
       attempt = 0;
       setStatus('connecté', 'ok');
+      setTransport('WebSocket (chiffré)',
+        "Session ouverte en wss:// — chiffrée par TLS jusqu'au panneau, comme le reste du site.");
       sendResize();
       term.focus();
       // The old shell died with the old socket; say so rather than pretending
@@ -284,6 +304,7 @@
       if (why) {
         stopped = true;
         setStatus(why, 'dim');
+        setTransport('');
         term.writeln('\r\n\x1b[90m[session terminée — ' + why + ']\x1b[0m');
         return;
       }
