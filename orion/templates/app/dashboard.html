@@ -3,6 +3,10 @@
 {% block breadcrumb %}<span class="breadcrumb">{{ brand }} hosting · espace client</span>{% endblock %}
 {% block heading %}Tableau de bord{% endblock %}
 
+{# Même règle que sur la liste : tant qu'une instance est en cours de création ou
+   de suppression, le tableau se recharge tout seul, puis s'arrête. #}
+{% block head_extra %}{% if live %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+
 {% block actions %}
 {# L'entrée « Nouvelle instance » vit dans la colonne, avec le reste du service :
    un second bouton en haut du tableau de bord ne faisait que la doubler. #}

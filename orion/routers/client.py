@@ -238,10 +238,20 @@ async def dashboard(request: Request):
 
     return render(request, "app/dashboard.html", session=session,
                   rows=rows, usage=usage, invoices=invoices, published=published,
-                  running_jobs=tasks.running())
+                  running_jobs=tasks.running(), live=_live(rows))
 
 
 # --------------------------------------------------------------------------- instances
+
+def _live(rows) -> bool:
+    """True while a row is mid-flight: provisioning or being torn down.
+
+    The list has no other way of knowing that its own content is about to change,
+    so the pages use this to refresh themselves for as long as it matters - and to
+    stop as soon as it does not.
+    """
+    return any(r["status"] in ("provisioning", "destroying") for r in rows)
+
 
 @router.get("/instances")
 async def instances(request: Request):
@@ -258,7 +268,8 @@ async def instances(request: Request):
             "WHERE i.user_id = ? AND i.status != 'destroyed' ORDER BY i.id DESC",
             (session["uid"],))
     info = detect()
-    return render(request, "app/instances.html", session=session, instances=rows, info=info)
+    return render(request, "app/instances.html", session=session, instances=rows, info=info,
+                  live=_live(rows))
 
 
 @router.get("/instances/new")
@@ -406,6 +417,15 @@ async def instance_destroy(request: Request, instance_id: int):
         return RedirectResponse(
             f"/app/instances/{instance_id}?err=Confirmation+incorrecte+:+saisissez+le+nom+exact",
             status_code=303)
+    # La destruction est une tâche de fond, et la redirection qui suit part avant
+    # qu'elle ait fini : sans marque posée ici, la liste rechargée dans la foulée
+    # montrait encore l'instance vivante, et rien ne venait plus la corriger. La
+    # ligne dit maintenant « Suppression… » tout de suite, puis disparaît d'elle
+    # même quand la page se rafraîchit.
+    db.execute("UPDATE instances SET status = 'destroying', updated_at = ? WHERE id = ?",
+               (now(), instance_id))
+    activity.log("instance.destroying", user_id=session["uid"], target=instance["slug"],
+                 ip=client_ip(request))
     tasks.start("destroy", instance_id, lambda job_id: provision.destroy(instance_id))
     return RedirectResponse("/app/instances?ok=Suppression+lanc%C3%A9e", status_code=303)
 

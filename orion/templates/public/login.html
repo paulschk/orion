@@ -31,6 +31,10 @@
          La fonction est déclarée avant le script de l'API : celui-ci est `async`,
          il peut donc l'appeler avant que la suite du document soit lue. #}
       <div id="turnstile-slot" class="mt3" data-sitekey="{{ turnstile_site_key }}"></div>
+      {# Dit à voix haute ce que la case ne montre pas toujours : le widget « géré »
+         n'affiche son cadre que lorsque Cloudflare réclame une interaction, et un
+         captcha que personne ne voit passe pour un captcha absent. #}
+      <p class="tiny dim mt2">Protégé par Cloudflare.</p>
       <script>
         window.orionTurnstileReady = function () {
           var slot = document.getElementById('turnstile-slot');

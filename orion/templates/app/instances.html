@@ -3,6 +3,13 @@
 {% block heading %}Mes instances{% endblock %}
 {% block actions %}{% endblock %}
 
+{# Tant qu'une instance est en mouvement — en cours de création ou de suppression —
+   la liste se recharge d'elle-même. La redirection qui suit une suppression part
+   avant que la tâche ait fini : sans cela, la page reste sur l'ancien état et rien
+   ne vient plus la corriger. Le rafraîchissement s'arrête de lui-même dès qu'il
+   n'y a plus rien à attendre. #}
+{% block head_extra %}{% if live %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+
 {% block content %}
 <div class="card">
   <div class="card-h">

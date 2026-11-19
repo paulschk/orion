@@ -42,6 +42,7 @@ templates.env.globals.update(
 TEMPLATE_STATUS = {
     "awaiting_payment": ("À payer", "warn"),
     "provisioning": ("En cours", "warn"),
+    "destroying": ("Suppression…", "warn"),
     "running": ("En ligne", "ok"),
     "stopped": ("Arr\u00eat\u00e9e", "idle"),
     "suspended": ("Suspendue", "warn"),
