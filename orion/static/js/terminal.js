@@ -214,7 +214,18 @@
   function connect() {
     if (stopped || mode === 'fallback') return;
     setStatus(attempt ? 'reconnexion…' : 'connexion…');
-    ws = new WebSocket(pane.dataset.ws);
+
+    // Une poignée de main ne prend pas toujours la peine d'échouer proprement :
+    // certains environnements font lever le constructeur. Sans ce garde-fou,
+    // `connect()` s'arrête là et le repli n'est jamais atteint.
+    let socket = null;
+    try {
+      socket = new WebSocket(pane.dataset.ws);
+    } catch (e) {
+      startFallback('impossible à ouvrir');
+      return;
+    }
+    ws = socket;
     ws.binaryType = 'arraybuffer';
 
     // Une poignée de main qui n'aboutit pas ne déclenche ni `onopen` ni `onclose` :
