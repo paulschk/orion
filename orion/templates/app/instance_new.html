@@ -30,7 +30,7 @@
       <label class="tpl {{ 'sel' if on }}">
         <input type="radio" name="plan_id" value="{{ plan['id'] }}" {{ 'checked' if on }} required>
         <div class="t">{{ plan['name'] }}</div>
-        <div class="d">{{ plan['vcpu'] }} vCPU · {{ plan['memory_mb']|human_mb }} de RAM · {{ plan['disk_gb'] }} Go</div>
+        <div class="d">{{ plan['vcpu'] }} vCPU · {{ (plan['memory_mb'] // 1024) ~ ' Go' if plan['memory_mb'] % 1024 == 0 else plan['memory_mb'] ~ ' Mo' }} de RAM · {{ plan['disk_gb'] }} Go</div>
         <div class="tiny dim mt1">{{ plan['price_cents']|money }} / mois</div>
       </label>
       {% endfor %}
