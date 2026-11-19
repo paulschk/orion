@@ -469,10 +469,20 @@
   // l'instance qu'on vient de quitter — un shell qui tourne pour personne. On
   // ferme donc au moment du remplacement, une fois les variables en portée (un
   // module d'instance arrêtée sort plus haut et n'a rien à fermer).
-  document.body.addEventListener('htmx:beforeSwap', function () {
+  //
+  // Seulement si le remplacement emporte le panneau. Un fragment qui se rafraîchit
+  // à côté — la pastille d'état, qui se recharge toute seule toutes les deux
+  // secondes — n'est pas un départ, et le prendre pour tel condamnait le terminal :
+  // le module se fermait dans les premiers dixièmes de seconde, la poignée de main
+  // échouait ensuite sans que personne ne la relève.
+  document.body.addEventListener('htmx:beforeSwap', function (event) {
+    const target = event.detail && event.detail.target;
+    if (!target || !target.contains(pane)) return;
     stopped = true;
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    if (hangTimer) { clearTimeout(hangTimer); hangTimer = null; }
     stopKeepalive();
+    if (fallback) { try { fallback.close(); } catch (e) { /* rien */ } fallback = null; }
     if (ws) { try { ws.close(); } catch (e) { /* déjà fermé */ } ws = null; }
     try { term.dispose(); } catch (e) { /* le panneau disparaît de toute façon */ }
   });
