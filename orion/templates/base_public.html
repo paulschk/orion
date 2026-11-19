@@ -14,6 +14,7 @@
 <title>{% block title %}{{ brand }} hosting{% endblock %} — {{ app_name }}</title>
 <meta name="description" content="{% block description %}Hébergement de petits serveurs virtuels, auto-hébergé chez {{ brand }}.{% endblock %}">
 <link rel="stylesheet" href="/static/css/orion.css?v={{ asset_version }}">
+{% block head %}{% endblock %}
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0c10'/><text x='16' y='23' font-size='19' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%233b82f6'>o</text></svg>">
 </head>
 <body>
