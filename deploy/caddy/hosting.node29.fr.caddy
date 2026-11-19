@@ -3,13 +3,23 @@
 #   docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 #   docker exec caddy caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfile
 #
-# The apex serves the panel and its presentation pages, and answers 403 to
-# everything outside the LAN. Every subdomain is a tenant website, routed by the
-# dedicated tenant Caddy that Orion configures over its admin API — those are the
-# clients' sites, so they are their own block and are not gated.
+# The apex serves the panel and its presentation pages. It is public, and behind
+# Cloudflare: the gate below allows Cloudflare's published ranges and the LAN, and
+# answers 403 to everything else. That is deliberate. Answering only Cloudflare
+# keeps the host's own address from being used to bypass the proxy, and it is what
+# makes `CF-Connecting-IP` - which Cloudflare overwrites on every request, and
+# which the panel reads for its sign-in throttle - worth believing.
 #
-# Pair it with an A record for hosting.node29.fr and *.hosting.node29.fr pointing
-# at this host, so the names resolve.
+# The ranges come from https://api.cloudflare.com/client/v4/ips, never from
+# memory. Cloudflare changes them rarely; a stale list darkens the panel for
+# everyone, so re-fetch and reload when in doubt.
+#
+# Every subdomain is a tenant website, routed by the dedicated tenant Caddy that
+# Orion configures over its admin API — those are the clients' sites, so they are
+# their own block and are deliberately neither proxied nor gated.
+#
+# Pair it with an A record for hosting.node29.fr (proxied) and *.hosting.node29.fr
+# (DNS only) pointing at this host, so the names resolve.
 #
 # The gate is a `handle` block, not a site-level `respond`, and that is not a
 # matter of style. Caddy sorts a site's directives by its own default order,
@@ -24,7 +34,7 @@
 # received 200 on /healthz. After it: five received 403, and the LAN kept 200.
 
 hosting.node29.fr {
-	@external not remote_ip 192.168.1.0/24
+	@external not remote_ip 192.168.1.0/24 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
 	handle @external {
 		respond 403
 	}

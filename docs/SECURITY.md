@@ -32,13 +32,27 @@ threat model to match.
   token is verified from the server against `siteverify`; a Cloudflare outage
   refuses the attempt rather than waving it through. With no keys set the widget
   is absent and the check is skipped, so the panel still runs on a machine with
-  no Cloudflare account.
-* **Exposure** — the panel's own hostname is gated to the LAN by the edge Caddy;
-  anything else gets 403. The tenant wildcard is deliberately *not* gated: those
-  are the clients' sites. The gate lives inside a `handle` block because a
-  site-level `respond` is reordered after the `handle`s by Caddy's default
-  directive order and never runs — measured before that fix, the panel answered
-  `/healthz` to the open internet from five different networks.
+  no Cloudflare account. The address counted is the visitor's: behind Cloudflare
+  the panel reads `CF-Connecting-IP`, which Cloudflare overwrites on every
+  request, rather than `X-Forwarded-For`, which the edge rewrites.
+* **Exposure** — the panel is public, and behind Cloudflare. Its A record is
+  proxied; the origin answers only Cloudflare's published ranges and the LAN, and
+  403 to everything else. That is what keeps the host's own address from being
+  used to bypass the proxy, and it is what makes `CF-Connecting-IP` worth
+  believing. The tenant wildcard is deliberately *not* proxied and *not* gated:
+  those are the clients' sites, meant to be reached directly. The Cloudflare
+  ranges are fetched from `https://api.cloudflare.com/client/v4/ips`, never
+  guessed; a stale list would darken the panel for everyone.
+* **The gate is a `handle` block**, not a site-level `respond`, and that is not a
+  matter of style. Caddy sorts a site's directives by its own default order,
+  which puts the `handle` blocks first; the first matching `handle` is terminal,
+  so a `respond` written above them runs after one has already answered — that
+  is, never. Written that way the gate sits in the running config, looks right on
+  every reading, and does nothing: measured before the fix, the panel answered
+  `/healthz` to the open internet from five different networks. Every gated site
+  on this host now carries its own `@external not remote_ip` line, which is worth
+  remembering when editing one of them: twelve sites are gated, and the first
+  line in the file belongs to none of the ones you probably meant.
 * **Tenant isolation** — CPU, memory and disk are enforced by cgroups and btrfs
   qgroups. There is no overcommit by default; creation is refused when the host
   cannot carry the plan.
@@ -58,14 +72,11 @@ threat model to match.
 4. **Registration is not rate limited.** The sign-in form is (see above); the
    sign-up form is not, so while `signup_open` is on a script can create accounts
    as fast as it can post.
-5. **Behind a proxy, the throttle follows the proxy.** `client_ip()` reads
-   `X-Forwarded-For`, which the edge Caddy sets. Putting the panel behind
-   Cloudflare without also reading `CF-Connecting-IP` would collapse every
-   visitor onto one address — and then one attacker could close the door for
-   everybody. Read that header before switching the DNS record to proxied.
-6. **No 2FA.**
-7. **`X-Forwarded-For` is trusted** for the purpose of logging and the activity
-   trail. It is set by the edge Caddy, which is the only path in.
+5. **No 2FA.**
+6. **Forwarded headers are trusted** for logging and the activity trail: the edge
+   Caddy sets `X-Forwarded-For`, and Cloudflare sets `CF-Connecting-IP` ahead of
+   it. Both are believed because the origin answers only Cloudflare's ranges and
+   the LAN. Loosen that gate and the throttle stops counting anything real.
 
 ## Reporting
 
