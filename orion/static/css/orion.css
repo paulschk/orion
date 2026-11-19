@@ -299,7 +299,12 @@ details summary:hover{color:var(--ink)}
    différentes ne se lisent plus. */
 .table-tight td,.table-tight th{white-space:nowrap}
 .table-tight td:first-child{white-space:normal}
-.table-tight .cell-addr{display:block;max-width:32ch;overflow:hidden;text-overflow:ellipsis}
+/* L'adresse est coupée, jamais repliée : `text-overflow` ne fait rien sans
+   `nowrap`, et sans lui le nom le plus long gagnait une ligne de plus que ses
+   voisins. L'adresse entière reste lisible à l'infobulle, et en clair dans la
+   tuile « Vos adresses » juste à côté. */
+.table-tight .cell-addr{display:block;max-width:32ch;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
 .push{margin-left:auto}
 .mt0{margin-top:0}
 .mb1{margin-bottom:8px}

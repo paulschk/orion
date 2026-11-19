@@ -80,7 +80,7 @@
           {% set lbl = status_labels.get(i['status'], (i['status'], 'muted')) %}
           <tr>
             <td><a href="/app/instances/{{ i['id'] }}">{{ i['name'] }}</a>
-                <div class="tiny dim mono cell-addr">{{ i['slug'] }}.{{ domain }}</div></td>
+                <div class="tiny dim mono cell-addr" title="{{ i['slug'] }}.{{ domain }}">{{ i['slug'] }}.{{ domain }}</div></td>
             {# L'offre et son modèle l'un au-dessus de l'autre : côte à côte, ils se
                repliaient dès que la colonne se resserrait, et la rangée gagnait une
                ligne de plus que ses voisines. #}
