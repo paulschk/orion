@@ -290,9 +290,16 @@ details summary:hover{color:var(--ink)}
 .right{text-align:right}
 .center{text-align:center}
 .nowrap{white-space:nowrap}
-/* L'offre et son étiquette de modèle sur la même ligne de base, dans une cellule
-   de tableau. */
-.cell-row{display:inline-flex;align-items:center}
+/* L'offre au-dessus de son modèle, alignés à gauche, l'un sous l'autre. */
+.cell-stack{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px}
+.cell-stack .slug{margin-left:0}
+/* Le tableau « Mes instances » ne se replie pas : chaque cellule tient sur une
+   ligne, et seule la première en porte deux — le nom, puis l'adresse, coupée
+   plutôt que repliée si elle est trop longue. Des rangées de hauteurs
+   différentes ne se lisent plus. */
+.table-tight td,.table-tight th{white-space:nowrap}
+.table-tight td:first-child{white-space:normal}
+.table-tight .cell-addr{display:block;max-width:32ch;overflow:hidden;text-overflow:ellipsis}
 .push{margin-left:auto}
 .mt0{margin-top:0}
 .mb1{margin-bottom:8px}
