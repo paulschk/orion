@@ -117,6 +117,8 @@
     </div>
     <div id="terminal" class="term-pane"
          data-ws="{{ 'wss' if base_url.startswith('https') else 'ws' }}://{{ request.headers.get('host') }}/ws/console/{{ instance['id'] }}"
+         data-stream="/app/instances/{{ instance['id'] }}/console/stream"
+         data-csrf="{{ csrf }}"
          data-state="{{ instance['status'] }}"></div>
     <p class="tiny dim mt2">
       Session root dans votre instance&nbsp;: Ctrl-C, redimensionnement et programmes plein écran

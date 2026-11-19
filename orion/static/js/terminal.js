@@ -115,6 +115,88 @@
   let stopped = false;
   const encoder = new TextEncoder();
 
+  // ---- Le repli HTTP ------------------------------------------------------
+  // Mesuré derrière Cloudflare : la poignée de main WebSocket d'un navigateur
+  // n'atteint jamais l'origine, alors que la même, écrite à la main en HTTP/1.1,
+  // est acceptée. Plutôt que d'en dépendre, le terminal bascule sur deux requêtes
+  // ordinaires — sortie en flux d'événements, entrée en POST — dès que la
+  // première n'aboutit pas, et le dit dans la barre d'état.
+  const HANG_MS = 4000;          // au-delà, la poignée de main n'aboutira pas
+  const INPUT_FLUSH_MS = 40;     // les frappes partent groupées, pas une par une
+  const streamUrl = pane.dataset.stream || '';
+  const csrfToken = pane.dataset.csrf || '';
+  let mode = 'ws';
+  let hangTimer = null;
+  let fallback = null;
+  let streamToken = '';
+  let pendingInput = '';
+  let inputTimer = null;
+
+  function base64ToBytes(text) {
+    const raw = atob(text);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+    return bytes;
+  }
+
+  function inputUrl() {
+    return streamUrl.replace('/stream', '/input');
+  }
+
+  function postInput(headers, body) {
+    if (!streamToken) return;
+    const all = Object.assign({ 'x-console-token': streamToken, 'x-csrf-token': csrfToken }, headers);
+    fetch(inputUrl(), { method: 'POST', headers: all, body: body, keepalive: true })
+      .catch(function () { /* le flux signalera lui-même qu'il est parti */ });
+  }
+
+  function flushInput() {
+    inputTimer = null;
+    const text = pendingInput;
+    pendingInput = '';
+    if (!text) return;
+    postInput({}, encoder.encode(text));
+  }
+
+  function queueInput(text) {
+    if (!streamToken) return;
+    pendingInput += text;
+    if (!inputTimer) inputTimer = setTimeout(flushInput, INPUT_FLUSH_MS);
+  }
+
+  function startFallback(reason) {
+    if (mode === 'fallback' || stopped || !streamUrl || !window.EventSource) return;
+    mode = 'fallback';
+    if (hangTimer) { clearTimeout(hangTimer); hangTimer = null; }
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    stopKeepalive();
+    if (ws) { try { ws.close(); } catch (e) { /* déjà fermé */ } ws = null; }
+
+    setStatus('repli HTTP…', 'warn');
+    term.writeln('\r\n\x1b[90m[le WebSocket n\'a pas abouti' + (reason ? ' — ' + reason : '') +
+                 ' : bascule sur le transport HTTP]\x1b[0m');
+
+    fallback = new EventSource(streamUrl);
+    fallback.addEventListener('ready', function (event) {
+      try { streamToken = JSON.parse(event.data).token || ''; } catch (e) { streamToken = ''; }
+      setStatus('connecté (HTTP)', 'ok');
+      term.focus();
+      sendResize();
+    });
+    fallback.onmessage = function (event) {
+      try { term.write(base64ToBytes(event.data), refreshJump); } catch (e) { /* bloc illisible */ }
+    };
+    fallback.onerror = function () {
+      if (!fallback) return;
+      const dead = fallback;
+      fallback = null;
+      stopped = true;
+      try { dead.close(); } catch (e) { /* rien */ }
+      setStatus('flux interrompu — rechargez la page', 'dim');
+      term.writeln('\r\n\x1b[31m[le flux HTTP s\'est interrompu]\x1b[0m');
+    };
+  }
+
   function stopKeepalive() {
     if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null; }
   }
@@ -130,12 +212,23 @@
   }
 
   function connect() {
-    if (stopped) return;
+    if (stopped || mode === 'fallback') return;
     setStatus(attempt ? 'reconnexion…' : 'connexion…');
     ws = new WebSocket(pane.dataset.ws);
     ws.binaryType = 'arraybuffer';
 
+    // Une poignée de main qui n'aboutit pas ne déclenche ni `onopen` ni `onclose` :
+    // elle reste en attente indéfiniment. Sans ce délai, le terminal resterait sur
+    // « connexion… » pour toujours — précisément ce qui a été observé à travers
+    // Cloudflare.
+    if (hangTimer) clearTimeout(hangTimer);
+    hangTimer = setTimeout(function () {
+      hangTimer = null;
+      if (ws && ws.readyState === WebSocket.CONNECTING) startFallback('aucune réponse');
+    }, HANG_MS);
+
     ws.onopen = function () {
+      if (hangTimer) { clearTimeout(hangTimer); hangTimer = null; }
       const wasRetry = attempt > 0;
       attempt = 0;
       setStatus('connecté', 'ok');
@@ -175,6 +268,7 @@
 
     ws.onclose = function (event) {
       stopKeepalive();
+      if (hangTimer) { clearTimeout(hangTimer); hangTimer = null; }
       const why = DEFINITIVE[event.code];
       if (why) {
         stopped = true;
@@ -182,11 +276,17 @@
         term.writeln('\r\n\x1b[90m[session terminée — ' + why + ']\x1b[0m');
         return;
       }
-      reconnect(event.code === 1006 ? 'liaison interrompue' : 'code ' + event.code);
+      // Pas de nouvelle tentative en WebSocket : une liaison qui vient d'échouer
+      // échouera de la même façon. Le repli HTTP prend la suite, et il marche.
+      startFallback(event.code === 1006 ? 'liaison interrompue' : 'code ' + event.code);
     };
   }
 
   function sendResize() {
+    if (mode === 'fallback') {
+      if (streamToken) postInput({ 'x-console-resize': term.cols + 'x' + term.rows }, null);
+      return;
+    }
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
   }
@@ -334,6 +434,7 @@
   }
 
   term.onData(function (data) {
+    if (mode === 'fallback') { queueInput(data); return; }
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(encoder.encode(data));
   });
   term.onResize(sendResize);
@@ -350,7 +451,7 @@
   // Browsers throttle timers in a hidden tab, so a backgrounded session often
   // comes back dropped. Reconnect the moment the tab is looked at again.
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState !== 'visible' || stopped) return;
+    if (document.visibilityState !== 'visible' || stopped || mode === 'fallback') return;
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
     attempt = 0;
