@@ -293,17 +293,16 @@ details summary:hover{color:var(--ink)}
 /* L'offre au-dessus de son modèle, alignés à gauche, l'un sous l'autre. */
 .cell-stack{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px}
 .cell-stack .slug{margin-left:0}
-/* Le tableau « Mes instances » ne se replie pas : chaque cellule tient sur une
-   ligne, et seule la première en porte deux — le nom, puis l'adresse, coupée
-   plutôt que repliée si elle est trop longue. Des rangées de hauteurs
-   différentes ne se lisent plus. */
+/* Le tableau « Mes instances » ne se replie pas. */
 .table-tight td,.table-tight th{white-space:nowrap}
-.table-tight td:first-child{white-space:normal}
-/* L'adresse est coupée, jamais repliée : `text-overflow` ne fait rien sans
-   `nowrap`, et sans lui le nom le plus long gagnait une ligne de plus que ses
-   voisins. L'adresse entière reste lisible à l'infobulle, et en clair dans la
-   tuile « Vos adresses » juste à côté. */
-.table-tight .cell-addr{display:block;max-width:32ch;overflow:hidden;
+/* La première cellule porte deux lignes par construction — le nom, puis
+   l'adresse — et aucune des deux ne se replie. Sans ce `nowrap`, un nom de
+   quarante caractères passait à la ligne et sa rangée mesurait 76 px là où ses
+   voisines en faisaient 62 : c'est la saute qu'on ne veut pas. L'adresse est
+   coupée au-delà de 48 caractères, jamais repliée (`text-overflow` ne fait rien
+   sans `nowrap`), et reste lisible à l'infobulle comme dans la tuile voisine. */
+.table-tight td:first-child{white-space:nowrap}
+.table-tight .cell-addr{display:block;max-width:48ch;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .push{margin-left:auto}
 .mt0{margin-top:0}
