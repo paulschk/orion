@@ -24,6 +24,15 @@ threat model to match.
 * **Audit trail** — authentication, provisioning, power actions, snapshots,
   console commands, site changes, plan edits and invoice transitions all land in
   `activity` with actor and source IP.
+* **Sign-in throttling and a captcha.** Six failed attempts from one address
+  within five minutes close the door for the rest of the window — checked before
+  the password is even compared, and a failed captcha counts as a failure too.
+  When a Cloudflare Turnstile key pair is set (`ORION_TURNSTILE_SITE_KEY` and
+  `ORION_TURNSTILE_SECRET`) the widget is rendered on the sign-in form and its
+  token is verified from the server against `siteverify`; a Cloudflare outage
+  refuses the attempt rather than waving it through. With no keys set the widget
+  is absent and the check is skipped, so the panel still runs on a machine with
+  no Cloudflare account.
 * **Exposure** — the panel's own hostname is gated to the LAN by the edge Caddy;
   anything else gets 403. The tenant wildcard is deliberately *not* gated: those
   are the clients' sites. The gate lives inside a `handle` block because a
@@ -46,9 +55,16 @@ threat model to match.
    refactor should encrypt them at rest or show them once and discard them.
 3. **Shared kernel.** Containers share the host kernel. A kernel exploit escapes
    into every tenant. Use VMs (Incus supports them) if that matters.
-4. **No rate limiting** on login or registration.
-5. **No 2FA.**
-6. **`X-Forwarded-For` is trusted** for the purpose of logging and the activity
+4. **Registration is not rate limited.** The sign-in form is (see above); the
+   sign-up form is not, so while `signup_open` is on a script can create accounts
+   as fast as it can post.
+5. **Behind a proxy, the throttle follows the proxy.** `client_ip()` reads
+   `X-Forwarded-For`, which the edge Caddy sets. Putting the panel behind
+   Cloudflare without also reading `CF-Connecting-IP` would collapse every
+   visitor onto one address — and then one attacker could close the door for
+   everybody. Read that header before switching the DNS record to proxied.
+6. **No 2FA.**
+7. **`X-Forwarded-For` is trusted** for the purpose of logging and the activity
    trail. It is set by the edge Caddy, which is the only path in.
 
 ## Reporting

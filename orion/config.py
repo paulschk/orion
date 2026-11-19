@@ -69,6 +69,12 @@ class Settings:
     billing_mode: str
     currency: str
 
+    # Anti-abuse: the Cloudflare Turnstile widget on the sign-in form. Empty
+    # values mean the widget is not rendered and the check is skipped, so the
+    # panel stays usable on a machine with no Cloudflare account.
+    turnstile_site_key: str
+    turnstile_secret: str
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "orion.db"
@@ -120,6 +126,8 @@ def load() -> Settings:
         disk_total_override=_i("ORION_DISK_TOTAL_GB", 0),
         billing_mode=_s("ORION_BILLING_MODE", "mock"),
         currency=_s("ORION_CURRENCY", "EUR"),
+        turnstile_site_key=_s("ORION_TURNSTILE_SITE_KEY", ""),
+        turnstile_secret=_s("ORION_TURNSTILE_SECRET", ""),
     )
 
 

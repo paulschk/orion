@@ -21,6 +21,12 @@
                autocomplete="current-password" required>
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%">Se connecter</button>
+
+      {% if turnstile_site_key %}
+      <div class="cf-turnstile mt3" data-sitekey="{{ turnstile_site_key }}"
+           data-theme="dark" data-language="fr"></div>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      {% endif %}
     </form>
 
     <p class="small muted mt3">
