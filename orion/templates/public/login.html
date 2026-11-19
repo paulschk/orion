@@ -23,9 +23,30 @@
       <button class="btn btn-primary" type="submit" style="width:100%">Se connecter</button>
 
       {% if turnstile_site_key %}
-      <div class="cf-turnstile mt3" data-sitekey="{{ turnstile_site_key }}"
-           data-theme="dark" data-language="fr"></div>
-      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      {# Rendu explicite, et non le scan automatique du script : le widget doit être
+         là dès l'ouverture du formulaire, pas après une tentative de connexion.
+         `appearance: always` force la case à s'afficher même quand Cloudflare
+         jugerait le visiteur assez sûr pour s'en passer — un captcha que personne
+         ne voit ne rassure personne, et le client croit qu'il ne fonctionne pas.
+         La fonction est déclarée avant le script de l'API : celui-ci est `async`,
+         il peut donc l'appeler avant que la suite du document soit lue. #}
+      <div id="turnstile-slot" class="mt3" data-sitekey="{{ turnstile_site_key }}"></div>
+      <script>
+        window.orionTurnstileReady = function () {
+          var slot = document.getElementById('turnstile-slot');
+          if (!slot || !window.turnstile || !window.turnstile.render || slot.dataset.rendered) return;
+          slot.dataset.rendered = '1';
+          window.turnstile.render(slot, {
+            sitekey: slot.dataset.sitekey,
+            theme: 'dark',
+            language: 'fr',
+            appearance: 'always'
+          });
+        };
+        if (window.turnstile && window.turnstile.render) window.orionTurnstileReady();
+      </script>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=orionTurnstileReady"
+              async defer></script>
       {% endif %}
     </form>
 
