@@ -25,20 +25,19 @@ CREATE TABLE IF NOT EXISTS users (
     role            TEXT    NOT NULL DEFAULT 'client',
     is_active       INTEGER NOT NULL DEFAULT 1,
     ssh_public_key  TEXT    NOT NULL DEFAULT '',
-    phone           TEXT    NOT NULL DEFAULT '',
-    phone_verified_at TEXT,
+    email_verified_at TEXT,
     created_at      TEXT    NOT NULL,
     last_login_at   TEXT
 );
 
--- One-time codes for phone confirmation. The code itself is never stored: only
--- its hash, with an expiry and an attempt counter.
-CREATE TABLE IF NOT EXISTS phone_codes (
+-- Single-use confirmation links. The token itself is never stored: only its
+-- hash, with an expiry and a used-at stamp.
+CREATE TABLE IF NOT EXISTS email_tokens (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         INTEGER NOT NULL,
-    code_hash       TEXT    NOT NULL,
+    token_hash      TEXT    NOT NULL,
+    used_at         TEXT,
     expires_at      TEXT    NOT NULL,
-    attempts        INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT    NOT NULL
 );
 
@@ -276,7 +275,7 @@ def migrate() -> None:
     """
     from . import identity
 
-    added_primary = False
+    added_email_verification = False
     with cursor(commit=True) as cur:
         if "machine_id" not in _columns(cur, "instances"):
             cur.execute("ALTER TABLE instances ADD COLUMN machine_id TEXT NOT NULL DEFAULT ''")
@@ -298,23 +297,34 @@ def migrate() -> None:
         else:
             added_primary = False
 
-        # Phone confirmation. The table is created here as well as in the schema
-        # script: a database that predates it must come up with it, and a route
-        # that reaches for a missing table answers 500.
+        # Email confirmation, which replaced a phone check that lasted an hour and
+        # was never used by anybody. The old table and columns go: a schema that
+        # keeps describing something the panel no longer does is worse than one
+        # that says what it does. Wrapped because DROP COLUMN needs SQLite 3.35,
+        # and a database that cannot do it should still come up.
         user_columns = _columns(cur, "users")
-        if "phone" not in user_columns:
-            cur.execute("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
-            print("[orion] schema: added users.phone")
-        if "phone_verified_at" not in user_columns:
-            cur.execute("ALTER TABLE users ADD COLUMN phone_verified_at TEXT")
-            print("[orion] schema: added users.phone_verified_at")
+        if "email_verified_at" not in user_columns:
+            cur.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+            print("[orion] schema: added users.email_verified_at")
+            added_email_verification = True
+        for obsolete in ("phone", "phone_verified_at"):
+            if obsolete in user_columns:
+                try:
+                    cur.execute("ALTER TABLE users DROP COLUMN {}".format(obsolete))
+                    print("[orion] schema: dropped users.{}".format(obsolete))
+                except Exception as exc:                     # noqa: BLE001
+                    print("[orion] schema: could not drop users.{} ({})".format(obsolete, exc))
+        try:
+            cur.execute("DROP TABLE IF EXISTS phone_codes")
+        except Exception as exc:                             # noqa: BLE001
+            print("[orion] schema: phone_codes left in place ({})".format(exc))
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS phone_codes ("
+            "CREATE TABLE IF NOT EXISTS email_tokens ("
             " id INTEGER PRIMARY KEY AUTOINCREMENT,"
             " user_id INTEGER NOT NULL,"
-            " code_hash TEXT NOT NULL,"
+            " token_hash TEXT NOT NULL,"
+            " used_at TEXT,"
             " expires_at TEXT NOT NULL,"
-            " attempts INTEGER NOT NULL DEFAULT 0,"
             " created_at TEXT NOT NULL)"
         )
 
@@ -328,6 +338,14 @@ def migrate() -> None:
                          "JOIN instances i ON i.id = s.instance_id"):
             if row["domain"] == f"{row['slug']}.{settings.domain}":
                 execute("UPDATE sites SET is_primary = 1 WHERE id = ?", (row["id"],))
+
+    # One-shot backfill: accounts that existed before the confirmation check are
+    # taken as confirmed. Without it every existing client would be locked out by
+    # a rule that arrived after them - and it must run only when the column
+    # appears, never on every boot, or it would confirm each new sign-up too.
+    if added_email_verification:
+        execute("UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL")
+        print("[orion] schema: existing accounts marked as confirmed")
 
     # The SSH port must be unique: two instances provisioning at once used to
     # pick the same one and the second failed to bind its proxy device.

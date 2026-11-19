@@ -1,0 +1,37 @@
+{% extends "base_public.html" %}
+{% block title %}Vérifiez votre boîte{% endblock %}
+{% block content %}
+<div class="container narrow" style="padding:56px 24px">
+  <div class="card">
+    <h1 style="font-size:1.35rem;margin-bottom:6px">Vérifiez votre boîte</h1>
+    <p class="muted small mb3">
+      {% if email %}Un lien de confirmation vient d'être envoyé à
+      <span class="mono">{{ email }}</span>.{% else %}Ouvrez le lien reçu par courriel pour
+      confirmer votre adresse.{% endif %}
+    </p>
+
+    {% if flash_ok %}<div class="alert info mb2">{{ flash_ok }}</div>{% endif %}
+    {% if flash_err %}<div class="alert err mb2">{{ flash_err }}</div>{% endif %}
+
+    {% if not delivering %}
+    {# Le dire plutôt que de laisser croire à un courriel perdu : sans envoi
+       configuré, le lien n'est allé nulle part. #}
+    <div class="alert info mb2">
+      Aucun envoi de courriel n'est configuré sur ce panneau : le lien a été écrit dans son
+      journal, personne ne l'a reçu. Voir <span class="mono">ORION_MAIL_BACKEND</span>.
+    </div>
+    {% endif %}
+
+    <p class="small muted">Le lien vaut 48 heures et ne sert qu'une fois.</p>
+
+    {% if email %}
+    <form method="post" action="/register/renvoyer" class="mt3">
+      <input type="hidden" name="email" value="{{ email }}">
+      <button class="btn btn-sm btn-ghost">Recevoir un nouveau lien</button>
+    </form>
+    {% endif %}
+
+    <p class="small muted mt3"><a href="/login">Retour à la connexion</a></p>
+  </div>
+</div>
+{% endblock %}

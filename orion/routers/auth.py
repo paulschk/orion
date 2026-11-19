@@ -9,7 +9,7 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from .. import activity, db, phone, security
+from .. import activity, db, mail, security
 from ..config import settings
 from ..deps import client_ip, fstr, session_optional
 from ..templating import render
@@ -127,13 +127,13 @@ async def login_submit(request: Request):
         return _login_page(request, status_code=403, email=email, next_url=next_url,
                            error="Ce compte est suspendu. Contactez l\u2019administrateur.")
 
-    # Un numéro enregistré mais jamais confirmé n'ouvre rien. Les comptes sans
-    # numéro — ceux d'avant cette vérification — passent : on ne réclame
-    # confirmation que de ce que l'on a pris la peine d'enregistrer.
-    if settings.require_phone and user["phone"] and not phone.confirmed(user):
-        activity.log("auth.phone_unconfirmed", user_id=user["id"], target=email, ip=ip)
+    # Une adresse enregistrée mais jamais confirmée n'ouvre rien. Les comptes
+    # d'avant cette vérification ont été marqués confirmés à la migration : ils
+    # existaient avant la règle, et rien d'autre ne leur permettrait d'entrer.
+    if settings.require_email_confirmation and not mail.confirmed(user):
+        activity.log("auth.email_unconfirmed", user_id=user["id"], target=email, ip=ip)
         return RedirectResponse(
-            "/register/verifier?email={}&err=Num%C3%A9ro+non+confirm%C3%A9".format(
+            "/register/confirmer?email={}&err=Adresse+non+confirm%C3%A9e".format(
                 quote(email, safe="")),
             status_code=303)
 
@@ -173,7 +173,6 @@ async def register_submit(request: Request):
     password = fstr(form, "password")
     name = fstr(form, "name")
     company = fstr(form, "company")
-    phone_number = phone.normalise(fstr(form, "phone"))
 
     if db.get_setting("signup_open") != "1":
         return render(request, "public/register.html", status_code=403,
@@ -185,34 +184,31 @@ async def register_submit(request: Request):
         problems.append("Adresse e-mail invalide.")
     if len(password) < 10:
         problems.append("Le mot de passe doit contenir au moins 10 caract\u00e8res.")
-    if settings.require_phone and not phone_number:
-        problems.append("Num\u00e9ro de t\u00e9l\u00e9phone invalide (exemple : 06 65 42 39 89).")
     if db.one("SELECT 1 FROM users WHERE email = ?", (email,)) is not None:
         problems.append("Un compte existe d\u00e9j\u00e0 avec cette adresse.")
 
     if problems:
         return render(request, "public/register.html", status_code=400,
                       error=" ".join(problems), email=email, name=name, company=company,
-                      phone=phone_number,
                       plans=db.query("SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order"),
                       signup_open=True)
 
     user_id = db.execute(
-        "INSERT INTO users(email, password_hash, name, company, role, is_active, phone, created_at) "
-        "VALUES(?, ?, ?, ?, 'client', 1, ?, ?)",
-        (email, security.hash_password(password), name or email.split("@")[0], company,
-         phone_number, now()),
+        "INSERT INTO users(email, password_hash, name, company, role, is_active, created_at) "
+        "VALUES(?, ?, ?, ?, 'client', 1, ?)",
+        (email, security.hash_password(password), name or email.split("@")[0], company, now()),
     )
     activity.log("auth.registered", user_id=user_id, target=email, ip=client_ip(request))
 
-    # Le compte existe, mais il n'ouvre rien tant que le num\u00e9ro n'est pas confirm\u00e9 :
-    # pas de session ici, un code d'abord.
-    if settings.require_phone:
-        _, message = phone.start(user_id, phone_number)
+    # Le compte existe, mais il n'ouvre rien tant que l'adresse n'a pas répondu :
+    # pas de session ici, un lien d'abord.
+    if settings.require_email_confirmation:
+        user = db.one("SELECT * FROM users WHERE id = ?", (user_id,))
+        _, message = mail.issue(user)
         activity.log("auth.registered_unconfirmed", user_id=user_id, target=email)
         return RedirectResponse(
-            "/register/verifier?email={}&ok={}".format(
-                quote(email, safe=""), quote(message, safe="")),
+            "/register/confirmer?email={}&ok={}".format(quote(email, safe=""),
+                                                        quote(message, safe="")),
             status_code=303)
 
     return _start_session(request, user_id, "/app?ok=Compte+cr%C3%A9%C3%A9")
@@ -233,52 +229,50 @@ def _start_session(request: Request, user_id: int, next_url: str) -> RedirectRes
     return response
 
 
-@router.get("/register/verifier")
-async def verify_phone_form(request: Request):
+@router.get("/register/confirmer")
+async def confirm_email(request: Request):
+    """Deux visages pour une adresse : le lien du courriel, et la page « vérifiez
+    votre boîte » sur laquelle on arrive juste après l'inscription."""
+    token = fstr(request.query_params, "token")
+
+    if token:
+        ok, message, user = mail.confirm(token)
+        if not ok:
+            return RedirectResponse(
+                "/register/confirmer?err={}".format(quote(message, safe="")), status_code=303)
+        activity.log("auth.registered_confirmed", user_id=user["id"], target=user["email"],
+                     ip=client_ip(request))
+        session = security.create_session(user["id"], client_ip(request),
+                                          request.headers.get("user-agent", ""))
+        db.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (now(), user["id"]))
+        return _start_session(request, user["id"],
+                              "/app?ok=Adresse+confirm%C3%A9e+-+bienvenue")
+
     session = session_optional(request)
     if session is not None:
         return RedirectResponse(_home_for(session), status_code=303)
+
     email = (fstr(request.query_params, "email") or "").lower()
-    user = db.one("SELECT * FROM users WHERE email = ?", (email,))
-    if user is None:
-        return RedirectResponse("/register?err=Compte+introuvable", status_code=303)
-    if phone.confirmed(user):
-        return RedirectResponse("/login?ok=Num%C3%A9ro+d%C3%A9j%C3%A0+confirm%C3%A9", status_code=303)
-    return render(request, "public/verify_phone.html", email=email,
-                  number=phone.pretty(user["phone"]),
-                  delivered=settings.sms_backend not in ("", "log"))
-
-
-@router.post("/register/verifier")
-async def verify_phone_submit(request: Request):
-    form = await request.form()
-    email = fstr(form, "email").lower()
-    user = db.one("SELECT * FROM users WHERE email = ?", (email,))
-    if user is None:
-        return RedirectResponse("/register?err=Compte+introuvable", status_code=303)
-
-    ok, message = phone.verify(user["id"], fstr(form, "code"))
-    if not ok:
-        return render(request, "public/verify_phone.html", status_code=400, error=message,
-                      email=email, number=phone.pretty(user["phone"]),
-                      delivered=settings.sms_backend not in ("", "log"))
-
-    activity.log("auth.registered_confirmed", user_id=user["id"], target=email,
-                 ip=client_ip(request))
-    return _start_session(request, user["id"], "/app?ok=Num%C3%A9ro+confirm%C3%A9")
+    user = db.one("SELECT * FROM users WHERE email = ?", (email,)) if email else None
+    if user is not None and mail.confirmed(user):
+        return RedirectResponse("/login?ok=Adresse+d%C3%A9j%C3%A0+confirm%C3%A9e", status_code=303)
+    return render(request, "public/check_mail.html", email=email,
+                  delivering=mail.delivering())
 
 
 @router.post("/register/renvoyer")
-async def resend_code(request: Request):
-    """Ask for another code. Throttled by phone.start(), which counts per account."""
+async def resend_confirmation(request: Request):
+    """Ask for another link. Throttled by mail.issue(), which counts per account."""
     form = await request.form()
     email = fstr(form, "email").lower()
     user = db.one("SELECT * FROM users WHERE email = ?", (email,))
-    if user is None or phone.confirmed(user):
-        return RedirectResponse("/login", status_code=303)
-    _, message = phone.start(user["id"], user["phone"])
+    if user is None:
+        return RedirectResponse("/register/confirmer?err=Compte+introuvable", status_code=303)
+    if mail.confirmed(user):
+        return RedirectResponse("/login?ok=Adresse+d%C3%A9j%C3%A0+confirm%C3%A9e", status_code=303)
+    _, message = mail.issue(user)
     return RedirectResponse(
-        "/register/verifier?email={}&ok={}".format(quote(email, safe=""), quote(message, safe="")),
+        "/register/confirmer?email={}&ok={}".format(quote(email, safe=""), quote(message, safe="")),
         status_code=303)
 
 

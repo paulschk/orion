@@ -75,11 +75,17 @@ class Settings:
     turnstile_site_key: str
     turnstile_secret: str
 
-    # Phone confirmation of new accounts. `sms_backend=log` writes the code to the
-    # panel's log so the flow can be exercised without a provider account; it is
-    # not a delivery method, and the panel says so where it matters.
-    require_phone: bool
-    sms_backend: str
+    # Confirmation of new accounts by email, and the sending of that email.
+    # `mail_backend=log` writes the link to the panel's log so the flow can be
+    # exercised without a mail account; `sendmail` hands it to the local MTA, and
+    # `smtp` talks to a relay. Only the last two attempt real delivery.
+    require_email_confirmation: bool
+    mail_backend: str
+    mail_from: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
 
     @property
     def db_path(self) -> Path:
@@ -134,8 +140,13 @@ def load() -> Settings:
         currency=_s("ORION_CURRENCY", "EUR"),
         turnstile_site_key=_s("ORION_TURNSTILE_SITE_KEY", ""),
         turnstile_secret=_s("ORION_TURNSTILE_SECRET", ""),
-        require_phone=_s("ORION_REQUIRE_PHONE", "1") == "1",
-        sms_backend=_s("ORION_SMS_BACKEND", "log"),
+        require_email_confirmation=_s("ORION_REQUIRE_EMAIL_CONFIRMATION", "1") == "1",
+        mail_backend=_s("ORION_MAIL_BACKEND", "log"),
+        mail_from=_s("ORION_MAIL_FROM", "no-reply@hosting.node29.fr"),
+        smtp_host=_s("ORION_SMTP_HOST", ""),
+        smtp_port=_i("ORION_SMTP_PORT", 587),
+        smtp_user=_s("ORION_SMTP_USER", ""),
+        smtp_password=_s("ORION_SMTP_PASSWORD", ""),
     )
 
 
