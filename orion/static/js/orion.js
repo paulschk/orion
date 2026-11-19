@@ -38,26 +38,21 @@ setInterval(function () {
 }, 500);
 
 
-// Template picker on the "new instance" page.
+// Template and plan pickers on the "new instance" page: both are radio cards, so
+// one delegated click drives both groups.
 document.addEventListener('click', function (event) {
   const tpl = event.target.closest('.tpl');
   if (!tpl) return;
   const group = tpl.closest('.tpl-pick');
   if (!group) return;
+  const radio = tpl.querySelector('input[type=radio]');
+  // A card whose radio is disabled is an offer withdrawn from sale: it must not
+  // mark itself chosen and must not displace the selection, or the browser
+  // refuses the form with nothing visible to explain why.
+  if (radio && radio.disabled) return;
   group.querySelectorAll('.tpl').forEach((el) => el.classList.remove('sel'));
   tpl.classList.add('sel');
-  const radio = tpl.querySelector('input[type=radio]');
   if (radio) { radio.checked = true; }
-});
-
-// Plan picker: keep the price preview in sync.
-document.addEventListener('change', function (event) {
-  const picker = event.target.closest('[data-plan-picker]');
-  if (!picker) return;
-  const target = document.querySelector(picker.dataset.planPicker);
-  if (!target) return;
-  const option = picker.selectedOptions[0];
-  if (option && option.dataset.summary) { target.textContent = option.dataset.summary; }
 });
 
 // Confirm destructive forms by typing the instance name.

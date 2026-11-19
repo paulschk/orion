@@ -374,11 +374,13 @@ details summary:hover{color:var(--ink)}
 .term-pane:fullscreen{background:#05070d}
 /* Le bouton plein écran suit le titre. `.tile-h > .btn` porte une auto-marge qui
    le renvoie à l'autre bout de la tête, et l'espacement « entre les enfants »
-   l'aurait posé au milieu : ni l'un ni l'autre ne le met à côté du titre. Le
-   statut, lui, part à droite. */
+   l'aurait posé au milieu : ni l'un ni l'autre ne le met à côté du titre. L'état
+   et son transport, eux, partent à droite — le groupe qui les porte compris, sans
+   quoi la règle cesse de s'appliquer dès qu'on les enveloppe. */
 .tile-h:has(> #term-fs){justify-content:flex-start}
 .tile-h:has(> #term-fs) > .btn{margin-left:0}
-.tile-h:has(> #term-fs) > .sub{margin-left:auto}
+.tile-h:has(> #term-fs) > .sub,
+.tile-h:has(> #term-fs) > #terminal-state{margin-left:auto}
 /* Le journal se replie, et vit sous la zone sensible. Le résumé prend la tête de
    tuile ordinaire, avec un mot qui dit ce que le clic fait. */
 details.journal-fold > summary{display:flex;align-items:baseline;gap:12px;cursor:pointer;
