@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .. import db, sites
 from ..config import settings
 from ..deps import session_optional
-from ..hostinfo import detect, headroom
 from ..templating import render
 
 router = APIRouter()
@@ -34,19 +33,19 @@ async def landing(request: Request):
     if session is not None:
         return RedirectResponse("/admin" if session["role"] == "admin" else "/app", status_code=303)
 
-    info = detect()
+    # No host detection here: the marketing pages describe what a client buys,
+    # never what the machine can still sell. See the note in pricing.html.
     plans = db.query("SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order")
-    return render(request, "public/landing.html", plans=plans, info=info,
-                  headroom=headroom(info), signup_open=db.get_setting("signup_open") == "1")
+    return render(request, "public/landing.html", plans=plans,
+                  signup_open=db.get_setting("signup_open") == "1")
 
 
 @router.get("/tarifs")
 async def pricing(request: Request):
     session = session_optional(request)
-    info = detect()
     plans = db.query("SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order")
-    return render(request, "public/pricing.html", plans=plans, info=info,
-                  headroom=headroom(info), signup_open=db.get_setting("signup_open") == "1")
+    return render(request, "public/pricing.html", plans=plans,
+                  signup_open=db.get_setting("signup_open") == "1")
 
 
 @router.get("/robots.txt")

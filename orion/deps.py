@@ -8,6 +8,17 @@ from . import security
 
 
 def client_ip(request: Request) -> str:
+    """The visitor's address, as far as the edge can honestly tell.
+
+    Behind Cloudflare the true address arrives in `CF-Connecting-IP`, which
+    Cloudflare overwrites on every request; the origin is reachable only through
+    Cloudflare or the LAN, so it can be trusted there. `X-Forwarded-For` is the
+    edge Caddy's chain and is the fallback, not the first choice: behind a proxy
+    it would collapse every visitor onto the proxy's own address.
+    """
+    from_cloudflare = request.headers.get("cf-connecting-ip", "").strip()
+    if from_cloudflare:
+        return from_cloudflare
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
         return forwarded.split(",")[0].strip()
