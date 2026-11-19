@@ -1,10 +1,84 @@
 {% extends "base_public.html" %}
 {% block title %}Connexion{% endblock %}
-{# Ouvre la connexion vers Cloudflare avant que le script du captcha soit
-   demandé : c'est la recommandation de leur propre documentation, et c'est le
-   délai de poignée de main qui sépare le premier affichage de la page de
-   l'apparition du cadre du widget. #}
-{% block head %}<link rel="preconnect" href="https://challenges.cloudflare.com">{% endblock %}
+{# Le script du captcha vient d'un autre domaine : il peut tarder, échouer, ou
+   être bloqué par un bloqueur de publicités — et le panneau refuse alors toute
+   connexion, faute de jeton, sans que rien ne l'explique à l'écran. Trois
+   précautions, ici.
+
+   La fonction de rappel est déclarée dans l'en-tête, donc avant tout ce qui peut
+   l'appeler : le `onload` de Cloudflare peut se produire avant que la fin du
+   document soit lue, et une fonction définie plus bas n'existe pas encore.
+
+   Le rendu est ensuite retenté, au lieu de dépendre du seul rappel. C'est ce qui
+   rattrape le cas où `onload` ne vient jamais — le widget n'arrivait alors
+   qu'« une fois sur deux », ce qui est la signature d'une course, pas d'une
+   panne franche. Le drapeau de rendu suit le succès au lieu de le précéder : un
+   rendu refusé n'interdit plus toute nouvelle tentative.
+
+   `preconnect` est la recommandation de leur propre documentation : la poignée
+   de main est ce qui sépare l'affichage de la page de l'apparition du cadre. #}
+{% block head %}
+<link rel="preconnect" href="https://challenges.cloudflare.com">
+<script>
+window.orionTurnstile = { widget: null, tentatives: 0, rendu: false, via: null };
+
+window.orionTurnstileEssai = function (origine) {
+  var t = window.orionTurnstile;
+  if (t.rendu) return;
+  var slot = document.getElementById('turnstile-slot');
+  if (!slot || slot.dataset.enCours) return;
+  if (!window.turnstile || !window.turnstile.render) return;   // pas encore arrivé
+  slot.dataset.enCours = '1';
+  try {
+    t.widget = window.turnstile.render(slot, {
+      sitekey: slot.dataset.sitekey,
+      theme: 'dark',
+      language: 'fr',
+      appearance: 'always'
+    });
+    t.rendu = true;
+    t.via = t.via || origine;
+    slot.dataset.rendered = '1';
+    var avis = document.getElementById('turnstile-indisponible');
+    if (avis) avis.style.display = 'none';
+    if (typeof window.orionTurnstileRendu === 'function') window.orionTurnstileRendu();
+  } catch (e) {
+    // L'API peut refuser un rendu demandé trop tôt : on retentera au tour suivant.
+  }
+  delete slot.dataset.enCours;
+};
+
+window.orionTurnstileReady = function () { window.orionTurnstileEssai('rappel'); };
+
+window.orionTurnstileAttente = function () {
+  var t = window.orionTurnstile;
+  if (t.rendu) return;
+  t.tentatives += 1;
+  window.orionTurnstileEssai('attente');
+  if (t.rendu) return;
+  if (t.tentatives < 48) {                 // ~12 s, toutes les 250 ms
+    setTimeout(window.orionTurnstileAttente, 250);
+    return;
+  }
+  var avis = document.getElementById('turnstile-indisponible');
+  if (avis) avis.style.display = 'block';
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', window.orionTurnstileAttente);
+} else {
+  window.orionTurnstileAttente();
+}
+
+// Un retour par l'historique restaure la page sans la recharger : le jeton du
+// captcha a alors pu expirer (cinq minutes) et le cadre affiche un délai dépassé
+// que rien ne réveille. Un redémarrage du widget suffit.
+window.addEventListener('pageshow', function (event) {
+  if (!event.persisted || !window.orionTurnstile.widget || !window.turnstile) return;
+  try { window.turnstile.reset(window.orionTurnstile.widget); } catch (e) { /* rien */ }
+});
+</script>
+{% endblock %}
 {% block content %}
 <div class="container narrow" style="padding:56px 24px">
   <div class="card">
@@ -28,32 +102,18 @@
       <button class="btn btn-primary" type="submit" style="width:100%">Se connecter</button>
 
       {% if turnstile_site_key %}
-      {# Rendu explicite, et non le scan automatique du script : le widget doit être
-         là dès l'ouverture du formulaire, pas après une tentative de connexion.
-         `appearance: always` force la case à s'afficher même quand Cloudflare
-         jugerait le visiteur assez sûr pour s'en passer — un captcha que personne
-         ne voit ne rassure personne, et le client croit qu'il ne fonctionne pas.
-         La fonction est déclarée avant le script de l'API : celui-ci est `async`,
-         il peut donc l'appeler avant que la suite du document soit lue. #}
       {# La place du cadre est réservée avant qu'il n'arrive : sinon le widget
          pousse le bouton au moment où il se dessine, et la page bouge sous le
-         doigt au moment précis où le visiteur s'apprête à cliquer. Hauteur
-         mesurée sur le panneau, pas déduite. #}
+         doigt juste avant le clic. Hauteur mesurée sur le panneau, pas déduite.#}
       <div id="turnstile-slot" class="mt3" style="min-height:71px" data-sitekey="{{ turnstile_site_key }}"></div>
-      <script>
-        window.orionTurnstileReady = function () {
-          var slot = document.getElementById('turnstile-slot');
-          if (!slot || !window.turnstile || !window.turnstile.render || slot.dataset.rendered) return;
-          slot.dataset.rendered = '1';
-          window.turnstile.render(slot, {
-            sitekey: slot.dataset.sitekey,
-            theme: 'dark',
-            language: 'fr',
-            appearance: 'always'
-          });
-        };
-        if (window.turnstile && window.turnstile.render) window.orionTurnstileReady();
-      </script>
+      {# Le seul message qui vaille : quand la vérification n'a pas pu se charger,
+         le panneau refusera la connexion et le visiteur n'a aucun moyen de le
+         deviner. Il n'apparaît qu'après douze secondes d'attente, et jamais dans
+         le cas normal. #}
+      <p class="tiny dim mt2" id="turnstile-indisponible" style="display:none">
+        La vérification Cloudflare n'a pas pu se charger. Rechargez la page ; si
+        cela se reproduit, un bloqueur empêche son script de s'exécuter.
+      </p>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=orionTurnstileReady"
               async defer></script>
       {% endif %}
