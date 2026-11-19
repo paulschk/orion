@@ -1,0 +1,43 @@
+{% extends "base_public.html" %}
+{% block title %}Confirmer votre numéro{% endblock %}
+{% block content %}
+<div class="container narrow" style="padding:56px 24px">
+  <div class="card">
+    <h1 style="font-size:1.35rem;margin-bottom:6px">Confirmer votre numéro</h1>
+    <p class="muted small mb3">
+      Un code à six chiffres a été envoyé au <span class="mono">{{ number }}</span>.
+    </p>
+
+    {% if flash_ok %}<div class="alert info mb2">{{ flash_ok }}</div>{% endif %}
+    {% if flash_err %}<div class="alert err mb2">{{ flash_err }}</div>{% endif %}
+    {% if error %}<div class="alert err mb2">{{ error }}</div>{% endif %}
+
+    {% if not delivered %}
+    {# Il faut le dire plutôt que de laisser croire à un SMS perdu : sans
+       fournisseur configuré, le code n'est allé nulle part. #}
+    <div class="alert info mb2">
+      Aucun fournisseur SMS n'est configuré sur ce panneau : le code a été écrit dans son
+      journal, il n'a été envoyé à personne. Voir <span class="mono">ORION_SMS_BACKEND</span>.
+    </div>
+    {% endif %}
+
+    <form method="post" action="/register/verifier">
+      <input type="hidden" name="email" value="{{ email }}">
+      <div class="field">
+        <label for="code">Code de confirmation</label>
+        <input class="input mono" id="code" name="code" inputmode="numeric" pattern="[0-9]*"
+               autocomplete="one-time-code" maxlength="6" required autofocus>
+        <span class="hint">Valable dix minutes, cinq essais.</span>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%">Confirmer</button>
+    </form>
+
+    <form method="post" action="/register/renvoyer" class="mt3">
+      <input type="hidden" name="email" value="{{ email }}">
+      <button class="btn btn-sm btn-ghost">Recevoir un nouveau code</button>
+    </form>
+
+    <p class="small muted mt3"><a href="/login">Retour à la connexion</a></p>
+  </div>
+</div>
+{% endblock %}

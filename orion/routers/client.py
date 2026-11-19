@@ -339,7 +339,7 @@ async def instance_create(request: Request):
         instance_id = db.execute(
             "INSERT INTO instances(user_id, plan_id, name, slug, incus_name, machine_id, template, "
             "status, ssh_user, ssh_port, initial_password, created_at, expires_at) "
-            "VALUES(?, ?, ?, ?, ?, ?, ?, 'provisioning', ?, ?, ?, ?, ?)",
+            "VALUES(?, ?, ?, ?, ?, ?, ?, 'awaiting_payment', ?, ?, ?, ?, ?)",
             (session["uid"], plan["id"], name or slug, slug,
              provision.incus_name_for(session["uid"], slug), identity.new_machine_id(), tpl.slug,
              ssh_user, ssh_port, rand_password(20), now(),
@@ -355,13 +355,16 @@ async def instance_create(request: Request):
                            plan_id=plan["id"], template=tpl.slug, name=name,
                            ssh_key=ssh_key)
 
-    _, invoice_id = billing.subscribe(session["uid"], plan["id"], instance_id)
-    activity.log("instance.created", user_id=session["uid"], target=slug,
+    subscription_id, invoice_id = billing.subscribe(session["uid"], plan["id"], instance_id,
+                                                   status="pending")
+    activity.log("instance.ordered", user_id=session["uid"], target=slug,
                  detail=f"{plan['slug']} / {tpl.slug} / invoice {invoice_id}", ip=client_ip(request))
 
-    tasks.start("provision", instance_id, lambda job_id: provision.provision(job_id, instance_id))
+    # Le couloir de paiement : la commande existe, la facture est due, et rien
+    # n'est construit tant que le paiement n'est pas confirmé. C'est le seul
+    # endroit où un vrai prestataire remplacerait cette redirection.
     return RedirectResponse(
-        f"/app/instances/{instance_id}?ok=Provisionnement+lanc%C3%A9+-+cela+prend+une+minute",
+        f"/app/factures/{invoice_id}?ok=Commande+enregistr%C3%A9e+-+r%C3%A9glez+la+facture",
         status_code=303)
 
 
@@ -903,6 +906,65 @@ async def invoices(request: Request):
     rows = billing.for_user_with_context(session["uid"])
     total_due = sum(r["amount_cents"] for r in rows if r["status"] != "paid")
     return render(request, "app/invoices.html", session=session, invoices=rows, total_due=total_due)
+
+
+def _my_invoice(invoice_id: int, session):
+    """The invoice, only if it belongs to the caller - or None."""
+    return next((r for r in billing.for_user_with_context(session["uid"])
+                 if r["id"] == invoice_id), None)
+
+
+@router.get("/factures/{invoice_id}")
+async def invoice_pay_page(request: Request, invoice_id: int):
+    """Le couloir de paiement, en une page.
+
+    Ce qui est commandé, ce qui est dû, ce que « payer » fait ici, et ce qui suit.
+    La même page sert à régler plus tard une facture laissée en attente.
+    """
+    session = require_user(request)
+    row = _my_invoice(invoice_id, session)
+    if row is None:
+        return RedirectResponse("/app/factures?err=Facture+introuvable", status_code=303)
+
+    instance = (db.one("SELECT * FROM instances WHERE id = ?", (row["instance_id"],))
+                if row["instance_id"] else None)
+    plan = (db.one("SELECT * FROM plans WHERE id = (SELECT plan_id FROM subscriptions WHERE id = ?)",
+                   (row["subscription_id"],)) if row["subscription_id"] else None)
+    return render(request, "app/invoice_pay.html", session=session, invoice=row,
+                  instance=instance, plan=plan,
+                  checkout=billing.start_checkout(session["uid"], plan["id"] if plan else 0,
+                                                  invoice_id))
+
+
+@router.post("/factures/{invoice_id}/payer")
+async def invoice_pay(request: Request, invoice_id: int):
+    """Le paiement, confirmé. C'est le point que le webhook d'un prestataire
+    appellerait à la place : tout ce qui suit est le couloir lui-même."""
+    session = require_user(request)
+    form = await request.form()
+    guard_csrf(request, session, form)
+
+    row = _my_invoice(invoice_id, session)
+    if row is None:
+        return RedirectResponse("/app/factures?err=Facture+introuvable", status_code=303)
+    if row["status"] == "paid":
+        return RedirectResponse(
+            f"/app/factures/{invoice_id}?ok=Facture+d%C3%A9j%C3%A0+r%C3%A9gl%C3%A9e", status_code=303)
+
+    instance_id = billing.confirm_payment(invoice_id, session["uid"])
+    instance = db.one("SELECT * FROM instances WHERE id = ?", (instance_id,)) if instance_id else None
+    if instance is None or instance["user_id"] != session["uid"]:
+        return RedirectResponse("/app/factures?ok=Paiement+enregistr%C3%A9", status_code=303)
+
+    if instance["status"] == "awaiting_payment":
+        db.execute("UPDATE instances SET status = 'provisioning' WHERE id = ?", (instance_id,))
+        activity.log("instance.provisioning", user_id=session["uid"], target=instance["slug"],
+                     detail=f"paid invoice {invoice_id}", ip=client_ip(request))
+        tasks.start("provision", instance_id,
+                    lambda job_id: provision.provision(job_id, instance_id))
+    return RedirectResponse(
+        f"/app/instances/{instance_id}?ok=Paiement+enregistr%C3%A9+-+provisionnement+lanc%C3%A9",
+        status_code=303)
 
 
 @router.get("/compte")

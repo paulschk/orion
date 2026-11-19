@@ -75,6 +75,12 @@ class Settings:
     turnstile_site_key: str
     turnstile_secret: str
 
+    # Phone confirmation of new accounts. `sms_backend=log` writes the code to the
+    # panel's log so the flow can be exercised without a provider account; it is
+    # not a delivery method, and the panel says so where it matters.
+    require_phone: bool
+    sms_backend: str
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "orion.db"
@@ -128,6 +134,8 @@ def load() -> Settings:
         currency=_s("ORION_CURRENCY", "EUR"),
         turnstile_site_key=_s("ORION_TURNSTILE_SITE_KEY", ""),
         turnstile_secret=_s("ORION_TURNSTILE_SECRET", ""),
+        require_phone=_s("ORION_REQUIRE_PHONE", "1") == "1",
+        sms_backend=_s("ORION_SMS_BACKEND", "log"),
     )
 
 

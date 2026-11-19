@@ -25,8 +25,21 @@ CREATE TABLE IF NOT EXISTS users (
     role            TEXT    NOT NULL DEFAULT 'client',
     is_active       INTEGER NOT NULL DEFAULT 1,
     ssh_public_key  TEXT    NOT NULL DEFAULT '',
+    phone           TEXT    NOT NULL DEFAULT '',
+    phone_verified_at TEXT,
     created_at      TEXT    NOT NULL,
     last_login_at   TEXT
+);
+
+-- One-time codes for phone confirmation. The code itself is never stored: only
+-- its hash, with an expiry and an attempt counter.
+CREATE TABLE IF NOT EXISTS phone_codes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    code_hash       TEXT    NOT NULL,
+    expires_at      TEXT    NOT NULL,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -284,6 +297,26 @@ def migrate() -> None:
             added_primary = True
         else:
             added_primary = False
+
+        # Phone confirmation. The table is created here as well as in the schema
+        # script: a database that predates it must come up with it, and a route
+        # that reaches for a missing table answers 500.
+        user_columns = _columns(cur, "users")
+        if "phone" not in user_columns:
+            cur.execute("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+            print("[orion] schema: added users.phone")
+        if "phone_verified_at" not in user_columns:
+            cur.execute("ALTER TABLE users ADD COLUMN phone_verified_at TEXT")
+            print("[orion] schema: added users.phone_verified_at")
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS phone_codes ("
+            " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " user_id INTEGER NOT NULL,"
+            " code_hash TEXT NOT NULL,"
+            " expires_at TEXT NOT NULL,"
+            " attempts INTEGER NOT NULL DEFAULT 0,"
+            " created_at TEXT NOT NULL)"
+        )
 
     # One-shot backfill: the site whose domain is exactly the instance's
     # generated name is the instance's own address. It must run only when the

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import time
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 
-from .. import activity, db, security
+from .. import activity, db, phone, security
 from ..config import settings
 from ..deps import client_ip, fstr, session_optional
 from ..templating import render
@@ -126,6 +127,16 @@ async def login_submit(request: Request):
         return _login_page(request, status_code=403, email=email, next_url=next_url,
                            error="Ce compte est suspendu. Contactez l\u2019administrateur.")
 
+    # Un numéro enregistré mais jamais confirmé n'ouvre rien. Les comptes sans
+    # numéro — ceux d'avant cette vérification — passent : on ne réclame
+    # confirmation que de ce que l'on a pris la peine d'enregistrer.
+    if settings.require_phone and user["phone"] and not phone.confirmed(user):
+        activity.log("auth.phone_unconfirmed", user_id=user["id"], target=email, ip=ip)
+        return RedirectResponse(
+            "/register/verifier?email={}&err=Num%C3%A9ro+non+confirm%C3%A9".format(
+                quote(email, safe="")),
+            status_code=303)
+
     _fails.pop(ip, None)          # une connexion réussie efface l'ardoise
     session = security.create_session(user["id"], ip,
                                      request.headers.get("user-agent", ""))
@@ -162,6 +173,7 @@ async def register_submit(request: Request):
     password = fstr(form, "password")
     name = fstr(form, "name")
     company = fstr(form, "company")
+    phone_number = phone.normalise(fstr(form, "phone"))
 
     if db.get_setting("signup_open") != "1":
         return render(request, "public/register.html", status_code=403,
@@ -173,24 +185,44 @@ async def register_submit(request: Request):
         problems.append("Adresse e-mail invalide.")
     if len(password) < 10:
         problems.append("Le mot de passe doit contenir au moins 10 caract\u00e8res.")
+    if settings.require_phone and not phone_number:
+        problems.append("Num\u00e9ro de t\u00e9l\u00e9phone invalide (exemple : 06 65 42 39 89).")
     if db.one("SELECT 1 FROM users WHERE email = ?", (email,)) is not None:
         problems.append("Un compte existe d\u00e9j\u00e0 avec cette adresse.")
 
     if problems:
         return render(request, "public/register.html", status_code=400,
                       error=" ".join(problems), email=email, name=name, company=company,
+                      phone=phone_number,
                       plans=db.query("SELECT * FROM plans WHERE is_active = 1 ORDER BY sort_order"),
                       signup_open=True)
 
     user_id = db.execute(
-        "INSERT INTO users(email, password_hash, name, company, role, is_active, created_at) "
-        "VALUES(?, ?, ?, ?, 'client', 1, ?)",
-        (email, security.hash_password(password), name or email.split("@")[0], company, now()),
+        "INSERT INTO users(email, password_hash, name, company, role, is_active, phone, created_at) "
+        "VALUES(?, ?, ?, ?, 'client', 1, ?, ?)",
+        (email, security.hash_password(password), name or email.split("@")[0], company,
+         phone_number, now()),
     )
-    session = security.create_session(user_id, client_ip(request), request.headers.get("user-agent", ""))
     activity.log("auth.registered", user_id=user_id, target=email, ip=client_ip(request))
 
-    response = RedirectResponse("/app?ok=Compte+cr%C3%A9%C3%A9", status_code=303)
+    # Le compte existe, mais il n'ouvre rien tant que le num\u00e9ro n'est pas confirm\u00e9 :
+    # pas de session ici, un code d'abord.
+    if settings.require_phone:
+        _, message = phone.start(user_id, phone_number)
+        activity.log("auth.registered_unconfirmed", user_id=user_id, target=email)
+        return RedirectResponse(
+            "/register/verifier?email={}&ok={}".format(
+                quote(email, safe=""), quote(message, safe="")),
+            status_code=303)
+
+    return _start_session(request, user_id, "/app?ok=Compte+cr%C3%A9%C3%A9")
+
+
+def _start_session(request: Request, user_id: int, next_url: str) -> RedirectResponse:
+    """Open a session and send the client on their way."""
+    session = security.create_session(user_id, client_ip(request),
+                                      request.headers.get("user-agent", ""))
+    response = RedirectResponse(next_url, status_code=303)
     response.set_cookie(
         security.SESSION_COOKIE, session["token"],
         max_age=security.SESSION_DAYS * 86400,
@@ -199,6 +231,55 @@ async def register_submit(request: Request):
         path="/",
     )
     return response
+
+
+@router.get("/register/verifier")
+async def verify_phone_form(request: Request):
+    session = session_optional(request)
+    if session is not None:
+        return RedirectResponse(_home_for(session), status_code=303)
+    email = (fstr(request.query_params, "email") or "").lower()
+    user = db.one("SELECT * FROM users WHERE email = ?", (email,))
+    if user is None:
+        return RedirectResponse("/register?err=Compte+introuvable", status_code=303)
+    if phone.confirmed(user):
+        return RedirectResponse("/login?ok=Num%C3%A9ro+d%C3%A9j%C3%A0+confirm%C3%A9", status_code=303)
+    return render(request, "public/verify_phone.html", email=email,
+                  number=phone.pretty(user["phone"]),
+                  delivered=settings.sms_backend not in ("", "log"))
+
+
+@router.post("/register/verifier")
+async def verify_phone_submit(request: Request):
+    form = await request.form()
+    email = fstr(form, "email").lower()
+    user = db.one("SELECT * FROM users WHERE email = ?", (email,))
+    if user is None:
+        return RedirectResponse("/register?err=Compte+introuvable", status_code=303)
+
+    ok, message = phone.verify(user["id"], fstr(form, "code"))
+    if not ok:
+        return render(request, "public/verify_phone.html", status_code=400, error=message,
+                      email=email, number=phone.pretty(user["phone"]),
+                      delivered=settings.sms_backend not in ("", "log"))
+
+    activity.log("auth.registered_confirmed", user_id=user["id"], target=email,
+                 ip=client_ip(request))
+    return _start_session(request, user["id"], "/app?ok=Num%C3%A9ro+confirm%C3%A9")
+
+
+@router.post("/register/renvoyer")
+async def resend_code(request: Request):
+    """Ask for another code. Throttled by phone.start(), which counts per account."""
+    form = await request.form()
+    email = fstr(form, "email").lower()
+    user = db.one("SELECT * FROM users WHERE email = ?", (email,))
+    if user is None or phone.confirmed(user):
+        return RedirectResponse("/login", status_code=303)
+    _, message = phone.start(user["id"], user["phone"])
+    return RedirectResponse(
+        "/register/verifier?email={}&ok={}".format(quote(email, safe=""), quote(message, safe="")),
+        status_code=303)
 
 
 @router.get("/logout")

@@ -40,6 +40,7 @@ templates.env.globals.update(
 
 
 TEMPLATE_STATUS = {
+    "awaiting_payment": ("À payer", "warn"),
     "provisioning": ("En cours", "warn"),
     "running": ("En ligne", "ok"),
     "stopped": ("Arr\u00eat\u00e9e", "idle"),
@@ -74,6 +75,8 @@ def render(request: Request, template: str, *, session=None, status_code: int = 
         "flash_err": request.query_params.get("err"),
         "path": request.url.path,
         "status_labels": TEMPLATE_STATUS,
+        "billing_mode": settings.billing_mode,
+        "currency": settings.currency,
     }
     base.update(_nav_counts(session))
     base.update(context)

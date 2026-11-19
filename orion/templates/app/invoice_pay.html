@@ -1,0 +1,85 @@
+{% extends "base_app.html" %}
+{% block title %}Facture {{ invoice['number'] }}{% endblock %}
+{% block breadcrumb %}<span class="breadcrumb"><a href="/app/factures">Factures</a> · {{ invoice['number'] }}</span>{% endblock %}
+{% block heading %}{{ 'Commande réglée' if invoice['status'] == 'paid' else 'Régler la commande' }}{% endblock %}
+{% block actions %}{% endblock %}
+
+{% block content %}
+
+{# Le couloir de paiement, en une page : ce qui est commandé, ce qui est dû, ce
+   que « payer » fait ici, et ce qui suit. Un vrai prestataire ne change qu'une
+   chose — c'est son adresse qu'on ouvre à l'étape 3, au lieu de ce bouton. #}
+<section class="band">
+  <div class="band-head">
+    <h2>Facture {{ invoice['number'] }}</h2>
+    <span class="sub">{{ invoice['description'] }}</span>
+  </div>
+
+  <div class="band-row">
+    <div class="kv-inline">
+      <div><span class="k">Machine</span><span class="v">{{ instance['name'] if instance else '—' }}</span></div>
+      <div><span class="k">Offre</span><span class="v">{% if plan %}{{ plan['name'] }} · {{ plan['vcpu'] }} vCPU / {{ plan['memory_mb']|human_mb }}{% else %}—{% endif %}</span></div>
+      <div><span class="k">Modèle</span><span class="v">{% if instance %}<span class="pill">{{ instance['template'] }}</span>{% else %}—{% endif %}</span></div>
+      <div><span class="k">Émise le</span><span class="v">{{ invoice['issued_at'][:10] }}</span></div>
+      <div><span class="k">À régler avant</span><span class="v">{{ invoice['due_at'][:10] if invoice['due_at'] else '—' }}</span></div>
+    </div>
+  </div>
+
+  <div class="band-row">
+    <div class="stat {{ 'ok' if invoice['status'] == 'paid' else 'warn' }}" style="max-width:300px">
+      <div class="k">{{ 'Montant réglé' if invoice['status'] == 'paid' else 'Montant dû' }}</div>
+      <div class="v">{{ invoice['amount_cents']|money }}<small class="dim"> {{ currency }}</small></div>
+    </div>
+  </div>
+</section>
+
+<div class="grid">
+  <section class="tile span7">
+    <div class="tile-h"><h2>Ce qui se passe ensuite</h2></div>
+    <ul class="steps">
+      <li class="done"><span class="tick">✓</span>Commande enregistrée — l'offre et le modèle sont réservés.</li>
+      <li class="done"><span class="tick">✓</span>Facture émise — {{ invoice['number'] }}.</li>
+      <li class="{{ 'done' if invoice['status'] == 'paid' else '' }}">
+        <span class="tick">{{ '✓' if invoice['status'] == 'paid' else '3' }}</span>
+        {% if invoice['status'] == 'paid' %}Paiement enregistré{% else %}Paiement{% endif %}
+        — {% if billing_mode == 'mock' %}simulé sur cette instance de démonstration, aucune somme n'est prélevée{% else %}auprès du prestataire{% endif %}.
+      </li>
+      <li class="{{ 'done' if instance and instance['status'] in ('provisioning', 'running', 'stopped') else '' }}">
+        <span class="tick">{{ '✓' if instance and instance['status'] not in ('awaiting_payment',) else '4' }}</span>
+        Construction de la machine — une à deux minutes, et son journal est sur sa page.
+      </li>
+    </ul>
+  </section>
+
+  <section class="tile span5">
+    {% if invoice['status'] == 'paid' %}
+      <div class="tile-h"><h2>Réglé</h2></div>
+      <p class="small muted">Le paiement a été enregistré le {{ invoice['paid_at'][:10] }}.</p>
+      {% if instance %}
+      <p class="mt3"><a class="btn btn-primary" href="/app/instances/{{ instance['id'] }}">Ouvrir la machine</a></p>
+      {% endif %}
+    {% else %}
+      <div class="tile-h"><h2>Paiement</h2><span class="sub">{{ checkout['mode'] }}</span></div>
+      <p class="small muted mb2">
+        {% if billing_mode == 'mock' %}
+        Cette instance du panneau fonctionne en mode démonstration : le règlement est
+        enregistré, la facture passe à « payée », et aucune somme n'est prélevée.
+        {% else %}
+        Vous allez être redirigé vers le prestataire de paiement.
+        {% endif %}
+      </p>
+      <form method="post" action="/app/factures/{{ invoice['id'] }}/payer">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-primary" style="width:100%">
+          {% if billing_mode == 'mock' %}Enregistrer le paiement{% else %}Payer {{ invoice['amount_cents']|money }} {{ currency }}{% endif %}
+        </button>
+      </form>
+      <p class="tiny dim mt3">
+        La machine ne se construit qu'après le paiement. Cette page reste accessible :
+        une commande laissée de côté peut être réglée plus tard.
+      </p>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}

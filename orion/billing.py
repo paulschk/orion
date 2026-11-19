@@ -39,15 +39,20 @@ def create_invoice(user_id: int, amount_cents: int, description: str, *,
     )
 
 
-def subscribe(user_id: int, plan_id: int, instance_id: int | None = None) -> tuple[int, int]:
-    """Create the subscription and its first invoice. Returns (subscription, invoice)."""
+def subscribe(user_id: int, plan_id: int, instance_id: int | None = None, *,
+              status: str = "active") -> tuple[int, int]:
+    """Create the subscription and its first invoice. Returns (subscription, invoice).
+
+    `status="pending"` is the client's path: the order exists, the invoice is due,
+    and nothing is provisioned until the payment is confirmed.
+    """
     plan = db.one("SELECT * FROM plans WHERE id = ?", (plan_id,))
     if plan is None:
         raise ValueError("unknown plan")
     subscription_id = db.execute(
         "INSERT INTO subscriptions(user_id, plan_id, instance_id, status, started_at, renews_at) "
-        "VALUES(?, ?, ?, 'active', ?, ?)",
-        (user_id, plan_id, instance_id, now(), days_from_now(plan["period_days"])),
+        "VALUES(?, ?, ?, ?, ?, ?)",
+        (user_id, plan_id, instance_id, status, now(), days_from_now(plan["period_days"])),
     )
     invoice_id = create_invoice(
         user_id, plan["price_cents"],
@@ -86,18 +91,52 @@ def all_invoices(limit: int = 200) -> list:
         "ORDER BY i.id DESC LIMIT ?", (limit,))
 
 
-def start_checkout(user_id: int, plan_id: int) -> dict:
-    """Integration point for a real payment provider.
+def invoice(invoice_id: int):
+    return db.one("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
 
-    With ORION_BILLING_MODE=mock this returns a pseudo checkout that the caller
-    immediately treats as paid. To go live, create a Stripe Checkout Session
-    here and return its URL instead - nothing else in the code path changes.
+
+def start_checkout(user_id: int, plan_id: int, invoice_id: int | None = None) -> dict:
+    """Where the money would be taken. One function, one seam.
+
+    In mock mode this hands back the panel's own payment page. The corridor is the
+    real one - nothing is provisioned before a payment is confirmed, and the
+    invoice, the subscription and the instance all have their own state - only the
+    cash is imaginary, and the page says so. To go live, create the provider's
+    session here and return its URL; its webhook then calls `confirm_payment()`
+    below, which is exactly what the mock's button calls.
     """
     if settings.billing_mode != "mock":
         raise NotImplementedError(
-            "Set ORION_BILLING_MODE=mock, or implement the Stripe branch of start_checkout()."
+            "Set ORION_BILLING_MODE=mock, or implement the provider branch of start_checkout() "
+            "and have its webhook call confirm_payment()."
         )
-    return {"mode": "mock", "status": "paid", "url": None}
+    return {"mode": "mock", "status": "pending",
+            "url": f"/app/factures/{invoice_id}" if invoice_id else None}
+
+
+def confirm_payment(invoice_id: int, actor_id: int | None = None) -> int | None:
+    """A payment came in: the invoice is settled and the subscription starts.
+
+    Returns the instance the invoice was for, so the caller can provision it.
+    Idempotent - a provider that retries its webhook settles nothing twice.
+    """
+    row = invoice(invoice_id)
+    if row is None:
+        raise ValueError("unknown invoice")
+    if row["status"] != "paid":
+        db.execute("UPDATE invoices SET status = 'paid', paid_at = ? WHERE id = ?",
+                   (now(), invoice_id))
+        activity.log("billing.invoice_paid", user_id=actor_id or row["user_id"],
+                     target=f"invoice:{invoice_id}")
+
+    subscription = (db.one("SELECT * FROM subscriptions WHERE id = ?", (row["subscription_id"],))
+                    if row["subscription_id"] else None)
+    if subscription is None:
+        return None
+    plan = db.one("SELECT period_days FROM plans WHERE id = ?", (subscription["plan_id"],))
+    db.execute("UPDATE subscriptions SET status = 'active', renews_at = ? WHERE id = ?",
+               (days_from_now(plan["period_days"] if plan else 30), subscription["id"]))
+    return subscription["instance_id"]
 
 
 def reminder_needed(subscription_row) -> bool:

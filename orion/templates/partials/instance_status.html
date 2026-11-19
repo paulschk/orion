@@ -34,6 +34,18 @@
     </p>
   </div>
 
+{% elif instance['status'] == 'awaiting_payment' %}
+  {# La machine n'existe pas encore : c'est le couloir de paiement qui décide de
+     sa construction, pas la commande. On le dit ici, où le client constate que
+     rien ne se passe. #}
+  <div class="alert info mt2">
+    <div class="spread">
+      <span class="small">Rien n'est encore construit&nbsp;: la commande attend le règlement
+        de sa facture.</span>
+      <a class="btn btn-sm btn-primary" href="/app/factures">Régler la facture</a>
+    </div>
+  </div>
+
 {% elif instance['status'] == 'error' %}
   <p class="small mt2" style="color:var(--bad)">{{ instance['error'] }}</p>
   {% if steps %}
