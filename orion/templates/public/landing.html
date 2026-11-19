@@ -16,9 +16,11 @@
       <a class="btn btn-primary" href="/tarifs">Voir les offres</a>
       <a class="btn" href="/login">Espace client</a>
     </div>
+    {# Ce que la machine peut encore vendre n'a rien à faire sur une page
+       publique : cela ne dit rien au visiteur et décrit l'hôte, qu'il n'a pas à
+       connaître. Ce qui le rassure, c'est ce qu'il obtient. #}
     <p class="small dim mt3">
-      Paiement mensuel, résiliable à tout moment · {{ info.sellable_vcpu }} vCPU et
-      {{ info.sellable_ram_mb|human_mb }} de RAM disponibles sur cette machine
+      Paiement mensuel, sans engagement · Sauvegardes et accès SSH inclus
     </p>
   </div>
 </div>
